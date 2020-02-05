@@ -47,11 +47,11 @@ class MetaBaseClassDecorator(MetaWrapper):
     OVERRIDE_ATTR = '__override__'
 
     @staticmethod
-    def decorate(controlFunction):
+    def decorate(*controlFunctions):
         """Utility function to add decorator to function '__override__' attribute"""
         def _decorate(decoratedFun):
             dec = getattr(decoratedFun, MetaBaseClassDecorator.OVERRIDE_ATTR, [])
-            dec.append(controlFunction)
+            dec.extend(controlFunctions)
             setattr(decoratedFun, MetaBaseClassDecorator.OVERRIDE_ATTR, dec)
             return decoratedFun
 
@@ -70,7 +70,7 @@ class MetaBaseClassDecorator(MetaWrapper):
                     except TypeError:
                         inhFun = decFunction(inhFun)
 
-                namespace[funName] = inhFun
+                namespace[funName] = mcs.decorate(*decFunctions)(inhFun)
 
         return super(MetaBaseClassDecorator, mcs).__new__(mcs, name, bases, namespace)
 
