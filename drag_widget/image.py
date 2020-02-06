@@ -14,20 +14,24 @@ class DragImage(QLabel, MimeBaseDragWidget, MimeBaseDropWidget):
 
         if isinstance(pixMap, str):
             pixMap = QPixmap(pixMap)
+            self.setPixmap(pixMap)
         elif isinstance(pixMap, int):
             p = QPixmap(*size)
             p.fill(pixMap)
-            pixMap = p
+            self.setPixmap(p)
         else:
-            pixMap = QPixmap(*size)
-        self.setPixmap(pixMap)
+            self.setText(text)
 
     def isMimeAccepted(self, mime: QMimeData) -> bool:
-        return mime.hasImage()
+        return mime.hasImage() or super().isMimeAccepted(mime)
 
     def setDataToMime(self, mime: QMimeData) -> None:
-        if mime.hasImage():
-            mime.setImageData(self.pixmap())
+        super().setDataToMime(mime)
+        mime.setImageData(self.pixmap())
 
     def setDataFromMime(self, mime: QMimeData) -> None:
-        self.setPixmap(mime.imageData())
+        super().setDataFromMime(mime)
+        if mime.hasImage():
+            image = mime.imageData()
+            if image:
+                self.setPixmap(image)
