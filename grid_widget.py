@@ -81,26 +81,20 @@ class Grid:
             assert len(curObj.positions) > 1
         self._data[key.x][key.y] = value
 
-    def firstFreePosition(self, x: int, y: int) -> Optional[Position]:
-        lastObject = self._data[x][y]
-        if lastObject is None:
-            return Position(x, y)
-        elif len(lastObject.positions) > 1:
-            return lastObject.bottomRight()
-
     def getLastPosition(self) -> Position:
         if self._data:
             x, y = self.x, self.y
-            if pos := self.firstFreePosition(x, y):
-                return pos
+
+            if self._data[x - 1][y - 1] is None:
+                return Position(x, y)
 
             elif x < y:
                 self.incRow()
-                return Position(0, y - 1)
+                return Position(x, 0)
 
             else:
                 self.incCol()
-                return Position(x - 1, 0)
+                return Position(0, y)
 
         else:
             self.incRow()
