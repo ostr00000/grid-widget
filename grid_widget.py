@@ -1,169 +1,14 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from operator import attrgetter
-from typing import Optional, List, Union, Type, TypeVar, Iterable, Dict
 
-from PyQt5.QtCore import QPoint, QRect
-from PyQt5.QtWidgets import QWidget
+from typing import Set
 
+from PyQt5.QtCore import QRect, QPoint, QSize
+from PyQt5.QtGui import QPaintEvent
+from PyQt5.QtWidgets import QWidget, QSizePolicy
 
-@dataclass
-class Node:
-    pass
-
-
-@dataclass
-class PositionNode(Node):
-    point: QPoint
-
-    topRight: Optional[ResourceNode] = None
-    topLeft: Optional[ResourceNode] = None
-    bottomLeft: Optional[ResourceNode] = None
-    bottomRight: Optional[ResourceNode] = None
-
-
-@dataclass
-class ResourceNode:
-    topRight: PositionNode
-    topLeft: PositionNode
-    bottomLeft: PositionNode
-    bottomRight: PositionNode
-
-    widget: Optional[QWidget] = None
-
-    top: List[PositionNode] = field(default_factory=list)
-    left: List[PositionNode] = field(default_factory=list)
-    bottom: List[PositionNode] = field(default_factory=list)
-    right: List[PositionNode] = field(default_factory=list)
-
-    def rightPositionsGen(self) -> Iterable[ResourceNode]:
-        rightBorder = [self.topRight] + self.right + [self.bottomRight]
-        for posNode in rightBorder:
-            if n := posNode.topRight:
-                yield n
-            if n := posNode.bottomRight:
-                yield n
-
-
-NodeType = TypeVar('NodeType', ResourceNode, PositionNode)
-
-
-def _filterGen(iterable, *types):
-    for i in iterable:
-        if isinstance(i, types):
-            yield i
-
-
-def _nodeGen(topPositionNode: PositionNode, isRightBorder: bool) -> NodeType:
-    nextRes = attrgetter('bottomRight' if isRightBorder else 'bottomLeft')
-    nextPos = attrgetter('bottomLeft' if isRightBorder else 'bottomRight')
-
-    yield topPositionNode
-    while resourceNode := nextRes(topPositionNode):
-        yield resourceNode
-        topPositionNode = nextPos(resourceNode)
-        yield topPositionNode
-
-
-@dataclass
-class BalanceCache:
-    initialGuess: int
-    correction: int
-
-
-class GraphTravel:
-    def __init__(self, gridGraph: GridGraph):
-        self.gridGraph: GridGraph = gridGraph
-        self._maxValCache = {}
-        self._balanceCache: Dict[int, BalanceCache] = {}
-
-    def leftBorderNodeGen(self, *allowNode: Type[NodeType]) -> Iterable[NodeType]:
-        yield from _filterGen(_nodeGen(self.gridGraph.tl, True), allowNode)
-
-    def rightBorderNodeGen(self, *allowNode: Union[Type[ResourceNode], Type[PositionNode]]):
-        yield from _filterGen(_nodeGen(self.gridGraph.tr, False), allowNode)
-
-    def countMaxColumns(self):
-        """Take maximum value from nodes on left"""
-        maxVal = 0
-        self._maxValCache.clear()
-
-        for resourceNode in self.leftBorderNodeGen(ResourceNode):
-            maxVal = max(self._countMaxColumns(resourceNode), maxVal)
-
-        return maxVal
-
-    def _countMaxColumns(self, resNode: ResourceNode) -> int:
-        """Ask each right node 'How many nodes are on the right?',
-         take maximum value and add self"""
-        try:
-            maxVal = self._maxValCache[id(resNode)]
-        except KeyError:
-            maxVal = max((self._countMaxColumns(rn) for rn in resNode.rightPositionsGen()),
-                         default=0) + 1
-            self._maxValCache[id(resNode)] = maxVal
-        return maxVal
-
-    def balance(self, rect: QRect):
-        columns = self.countMaxColumns()
-        if not columns:
-            return
-        avg = int(rect.width() / columns)
-
-        for resourceNode in self.leftBorderNodeGen(ResourceNode):
-            self._balance(resourceNode, columns)
-
-    def _balance(self, resourceNode: ResourceNode, columns: int):
-        """
-        1. let right node prepare
-        2. calc diff with child and correct its value
-        3. set own value
-        """
-        if id(resourceNode) in self._balanceCache:
-            return
-
-        myMaxCount = self._countMaxColumns(resourceNode)
-
-        for rn in resourceNode.rightPositionsGen():
-            self._balance(rn, columns)
-            diff = myMaxCount - self._countMaxColumns(rn)
-            self._balanceCache[id(rn)].correction = diff
-
-        myColumns = columns - myMaxCount + 1
-        self._balanceCache[id(resourceNode)] = BalanceCache(myColumns, myColumns)
-
-
-@dataclass
-class DagNode:
-    resource: ResourceNode
-    left: List[DagNode] = field(default_factory=list)
-    right: List[DagNode] = field(default_factory=list)
-
-    def __eq__(self, other):
-        if isinstance(other, DagNode):
-            return self.resource is other.resource
-        elif isinstance(other, ResourceNode):
-            return self.resource is other
-
-
-class DagGraph:
-    def __init__(self, gridGraph: GridGraph):
-        self._nodes: Dict[ResourceNode, DagNode] = {}
-
-        for node in GraphTravel(gridGraph).leftBorderNodeGen(ResourceNode):
-            self.getDagNode(node)
-
-    def getDagNode(self, rn: ResourceNode) -> DagNode:
-        try:
-            dg = self._nodes[rn]
-        except KeyError:
-            dg = self._nodes[rn] = DagNode(rn)
-            for r in rn.rightPositionsGen():
-                rdg = self.getDagNode(r)
-                dg.right.append(rdg)
-                rdg.left.append(dg)
-
-        return dg
+from nodes import PositionNode, ResourceNode
+from visitor import countMaxColumns, rightBorderGen, filterType, balanceHorizontal, \
+    balanceVertical, topDownLeftRightVisitor, countMaxRows
 
 
 class GridGraph:
@@ -193,7 +38,7 @@ class GridGraph:
             self.resourceNodes[0].widget = widget
             return
 
-        rightBorder = [rn for rn in GraphTravel(self).rightBorderNodeGen(PositionNode)]
+        rightBorder = list(filterType(rightBorderGen(self.tr), PositionNode))
         tl = self.tr
         self.tr = PositionNode(rect.topRight())
         bl = self.br
@@ -210,15 +55,67 @@ class GridGraph:
         rightBorder[0].topRight = None
         rightBorder[-1].bottomRight = None
 
-        GraphTravel(self).balance(rect)
+        self.balance(rect)
+
+    def balance(self, rect: QRect):
+        columns = countMaxColumns(self.tl)
+        maxColumn = columns[max(columns, key=columns.get)]
+        widthFactor = int(rect.width() / maxColumn)
+        balHor = balanceHorizontal(self.tl, maxColumn, columns)
+
+        rows = countMaxRows(self.tl)
+        maxRow = rows[max(rows, key=rows.get)]
+        heightFactor = int(rect.height() / maxRow)
+        balVer = balanceVertical(self.tl, maxRow, rows)
+
+        globalBottomRight = rect.bottomRight() + QPoint(1, 1)
+        visited: Set[int] = set()
+
+        def updatePoint(posNode: PositionNode, y: int, x: int):
+            posNodeId = id(posNode)
+            if posNodeId not in visited:
+                visited.add(posNodeId)
+
+                q_point = QPoint(x, y)
+                newPoint = globalBottomRight - q_point
+                posNode.point = newPoint
+
+        for node in topDownLeftRightVisitor(self.tl):
+            nodeId = id(node)
+            right = columns[nodeId] - 1
+            left = right + balHor[nodeId]
+            right *= widthFactor
+            left *= widthFactor
+
+            bottom = rows[nodeId] - 1
+            top = bottom + balVer[nodeId]
+            bottom *= heightFactor
+            top *= heightFactor
+
+            updatePoint(node.topRight, top, right)
+            updatePoint(node.bottomRight, bottom, right)
+            updatePoint(node.topLeft, top, left)
+            updatePoint(node.bottomLeft, bottom, left)
+
+            width = left - right
+            height = top - bottom
+            node.widget.move(node.topLeft.point)
+            node.widget.resize(width, height)
 
 
 class GridWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._grid = GridGraph(self.rect())
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def sizeHint(self) -> QSize:
+        return QSize(800, 800)
 
     def addWidget(self, widget: QWidget):
         widget.setParent(self)
         self._grid.insert(widget, self.rect())
         widget.show()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        self._grid.balance(self.rect())

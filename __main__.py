@@ -20,9 +20,13 @@ class MyWidget(QWidget):
         self.gridWidget = GridWidget(self)
         self.verticalLayout.addWidget(self.gridWidget)
 
+        self.onButtonClicked()
+        self.onButtonClicked()
+
     def onButtonClicked(self):
         self.num += 1
         frame = QFrame(self)
+        frame.setObjectName(f"Frame {self.num}")
 
         color = (randint(0, 255), randint(0, 255), randint(0, 255))
         frame.setStyleSheet("background-color: rgb({},{},{});".format(*color))
