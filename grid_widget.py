@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from operator import attrgetter
 from typing import Optional, List, Union, Type, TypeVar, Iterable, Dict
@@ -15,10 +16,10 @@ class Node:
 class PositionNode(Node):
     point: QPoint
 
-    topRight: Optional['ResourceNode'] = None
-    topLeft: Optional['ResourceNode'] = None
-    bottomLeft: Optional['ResourceNode'] = None
-    bottomRight: Optional['ResourceNode'] = None
+    topRight: Optional[ResourceNode] = None
+    topLeft: Optional[ResourceNode] = None
+    bottomLeft: Optional[ResourceNode] = None
+    bottomRight: Optional[ResourceNode] = None
 
 
 @dataclass
@@ -35,7 +36,7 @@ class ResourceNode:
     bottom: List[PositionNode] = field(default_factory=list)
     right: List[PositionNode] = field(default_factory=list)
 
-    def rightPositionsGen(self) -> Iterable['ResourceNode']:
+    def rightPositionsGen(self) -> Iterable[ResourceNode]:
         rightBorder = [self.topRight] + self.right + [self.bottomRight]
         for posNode in rightBorder:
             if n := posNode.topRight:
@@ -71,7 +72,7 @@ class BalanceCache:
 
 
 class GraphTravel:
-    def __init__(self, gridGraph):
+    def __init__(self, gridGraph: GridGraph):
         self.gridGraph: GridGraph = gridGraph
         self._maxValCache = {}
         self._balanceCache: Dict[int, BalanceCache] = {}
@@ -130,6 +131,39 @@ class GraphTravel:
 
         myColumns = columns - myMaxCount + 1
         self._balanceCache[id(resourceNode)] = BalanceCache(myColumns, myColumns)
+
+
+@dataclass
+class DagNode:
+    resource: ResourceNode
+    left: List[DagNode] = field(default_factory=list)
+    right: List[DagNode] = field(default_factory=list)
+
+    def __eq__(self, other):
+        if isinstance(other, DagNode):
+            return self.resource is other.resource
+        elif isinstance(other, ResourceNode):
+            return self.resource is other
+
+
+class DagGraph:
+    def __init__(self, gridGraph: GridGraph):
+        self._nodes: Dict[ResourceNode, DagNode] = {}
+
+        for node in GraphTravel(gridGraph).leftBorderNodeGen(ResourceNode):
+            self.getDagNode(node)
+
+    def getDagNode(self, rn: ResourceNode) -> DagNode:
+        try:
+            dg = self._nodes[rn]
+        except KeyError:
+            dg = self._nodes[rn] = DagNode(rn)
+            for r in rn.rightPositionsGen():
+                rdg = self.getDagNode(r)
+                dg.right.append(rdg)
+                rdg.left.append(dg)
+
+        return dg
 
 
 class GridGraph:
