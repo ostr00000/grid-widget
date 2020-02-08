@@ -1,12 +1,10 @@
-from dataclasses import dataclass, field
-from functools import reduce, partial
 from operator import attrgetter, methodcaller
-from typing import Iterable, Set, TypeVar, Iterator, Callable, Type, Union, Optional, Dict, \
-    NamedTuple, Tuple
+from typing import Iterable, Set, TypeVar, Iterator, Callable, Type, Union, Optional
 
 from nodes import PositionNode, ResourceNode
 
 T = TypeVar('T')
+NodeType = Union[PositionNode, ResourceNode]
 
 
 def filterType(iterable: Iterable, types: Type[T]) -> Iterable[T]:
@@ -15,128 +13,76 @@ def filterType(iterable: Iterable, types: Type[T]) -> Iterable[T]:
             yield i
 
 
-NodeType = Union[PositionNode, ResourceNode]
+class BorderGen:
+    @staticmethod
+    def left(topLeft: PositionNode):
+        return BorderGen._nodeGen(
+            topLeft, attrgetter('bottomRight'), attrgetter('bottomLeft'))
 
+    @staticmethod
+    def right(topRight: PositionNode):
+        return BorderGen._nodeGen(
+            topRight, attrgetter('bottomLeft'), attrgetter('bottomRight'))
 
-def nodeGen(startNode: NodeType,
-            resFun: Callable[[PositionNode], Optional[ResourceNode]],
-            posFun: Callable[[ResourceNode], Optional[PositionNode]],
-            ) -> Iterable[NodeType]:
-    if isinstance(startNode, PositionNode):
-        yield startNode
-        resNode = resFun(startNode)
-    else:
-        resNode = startNode
+    @staticmethod
+    def top(topLeft: PositionNode):
+        return BorderGen._nodeGen(
+            topLeft, attrgetter('bottomRight'), attrgetter('topRight'))
 
-    while resNode:
-        yield resNode
+    @staticmethod
+    def bottom(bottomLeft: PositionNode):
+        return BorderGen._nodeGen(
+            bottomLeft, attrgetter('topRight'), attrgetter('bottomRight'))
 
-        if posNode := posFun(resNode):
-            yield posNode
+    @staticmethod
+    def _nodeGen(startNode: NodeType,
+                 resFun: Callable[[PositionNode], Optional[ResourceNode]],
+                 posFun: Callable[[ResourceNode], Optional[PositionNode]],
+                 ) -> Iterable[NodeType]:
+        if isinstance(startNode, PositionNode):
+            yield startNode
+            resNode = resFun(startNode)
         else:
-            break
+            resNode = startNode
 
-        resNode = resFun(posNode)
+        while resNode:
+            yield resNode
 
+            if posNode := posFun(resNode):
+                yield posNode
+            else:
+                break
 
-def graphVisitor(iterable: Iterable[T], nextLevelFun: Callable[[T], Iterator[T]] = None,
-                 visited: Set[T] = None) -> Iterable[T]:
-    if visited is None:
-        visited = set()
-
-    for i in iterable:
-        if id(i) in visited:
-            continue
-
-        visited.add(id(i))
-        if nextLevelFun:
-            nextLevelIterator = nextLevelFun(i)
-            yield from graphVisitor(nextLevelIterator, nextLevelFun, visited)
-        yield i
+            resNode = resFun(posNode)
 
 
-def leftBorderGen(topNode: PositionNode):
-    return nodeGen(topNode, attrgetter('bottomRight'), attrgetter('bottomLeft'))
+class GraphVisitor:
+    @staticmethod
+    def topDownLeftRightVisitor(topLeft: PositionNode):
+        yield from GraphVisitor._graphVisitor(
+            filterType(BorderGen.left(topLeft), ResourceNode),
+            methodcaller('rightPositionsGen'))
 
+    @staticmethod
+    def leftRightTopDown(topLeft: PositionNode):
+        yield from GraphVisitor._graphVisitor(
+            filterType(BorderGen.top(topLeft), ResourceNode),
+            methodcaller('bottomPositionGen'))
 
-def rightBorderGen(topNode: PositionNode):
-    return nodeGen(topNode, attrgetter('bottomLeft'), attrgetter('bottomRight'))
+    @staticmethod
+    def _graphVisitor(iterable: Iterable[T],
+                      nextLevelFun: Callable[[T], Iterator[T]] = None,
+                      visited: Set[T] = None) -> Iterable[T]:
+        if visited is None:
+            visited = set()
 
+        for i in iterable:
+            if id(i) in visited:
+                continue
 
-def topBorderGen(leftNode: PositionNode):
-    return nodeGen(leftNode, attrgetter('bottomRight'), attrgetter('topRight'))
-
-
-def topDownLeftRightVisitor(topLeft: PositionNode):
-    yield from graphVisitor(
-        filterType(leftBorderGen(topLeft), ResourceNode),
-        methodcaller('rightPositionsGen'))
-
-
-def leftRightTopDown(topLeft: PositionNode):
-    yield from graphVisitor(
-        filterType(topBorderGen(topLeft), ResourceNode),
-        methodcaller('bottomPositionGen'))
-
-
-TravelDict = Dict[int, int]
-
-
-def _countMaxColumns(acc: TravelDict, node: ResourceNode) -> TravelDict:
-    acc[id(node)] = max(
-        (acc.get(id(rp)) for rp in node.rightPositionsGen()),
-        default=0) + 1
-    return acc
-
-
-def countMaxColumns(topLeft: PositionNode):
-    return reduce(_countMaxColumns, topDownLeftRightVisitor(topLeft), {})
-
-
-def _countMaxRows(acc: TravelDict, node: ResourceNode) -> TravelDict:
-    acc[id(node)] = max(
-        (acc.get(id(rp)) for rp in node.bottomPositionGen()),
-        default=0) + 1
-    return acc
-
-
-def countMaxRows(topLeft: PositionNode):
-    return reduce(_countMaxRows, leftRightTopDown(topLeft), {})
-
-
-@dataclass
-class _BalanceStruct:
-    maxColumn: int
-    columns: TravelDict
-    balanced: TravelDict = field(default_factory=dict)
-
-
-def _balance(acc: _BalanceStruct, node: ResourceNode,
-             childrenNodeFun: Callable[[ResourceNode], Iterator[ResourceNode]]
-             ) -> _BalanceStruct:
-    myColumn = acc.columns[id(node)]
-    for rp in childrenNodeFun(node):
-        childColumn = acc.columns[id(rp)]
-        diff = myColumn - childColumn
-        acc.balanced[id(rp)] = diff
-
-    acc.balanced[id(node)] = acc.maxColumn - myColumn + 1
-    return acc
-
-
-def balanceHorizontal(topLeft: PositionNode, maxColumn: int,
-                      columns: TravelDict) -> TravelDict:
-    return reduce(
-        partial(_balance, childrenNodeFun=methodcaller('rightPositionsGen')),
-        topDownLeftRightVisitor(topLeft),
-        _BalanceStruct(maxColumn, columns)
-    ).balanced
-
-
-def balanceVertical(topLeft: PositionNode, maxRow: int,
-                    rows: TravelDict) -> TravelDict:
-    return reduce(
-        partial(_balance, childrenNodeFun=methodcaller('bottomPositionGen')),
-        leftRightTopDown(topLeft),
-        _BalanceStruct(maxRow, rows)
-    ).balanced
+            visited.add(id(i))
+            if nextLevelFun:
+                nextLevelIterator = nextLevelFun(i)
+                yield from GraphVisitor._graphVisitor(
+                    nextLevelIterator, nextLevelFun, visited)
+            yield i

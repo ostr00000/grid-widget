@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, List, Iterable
 
-from PyQt5.QtCore import QPoint
+from PyQt5.QtCore import QPoint, QRect
 from PyQt5.QtWidgets import QWidget
 
 
@@ -42,22 +42,38 @@ class ResourceNode:
         self.bottomRight.topLeft = self
 
     def rightPositionsGen(self) -> Iterable[ResourceNode]:
-        rightBorder = [self.topRight] + self.right + [self.bottomRight]
-        for posNode in rightBorder:
+        if n := self.topRight.bottomRight:
+            yield n
+
+        for posNode in self.right:
             if n := posNode.topRight:
                 yield n
             if n := posNode.bottomRight:
                 yield n
 
+        if n := self.bottomRight.topRight:
+            yield n
+
     def bottomPositionGen(self) -> Iterable[ResourceNode]:
-        bottomBorder = [self.bottomLeft] + self.bottom + [self.bottomRight]
-        for posNode in bottomBorder:
+        if n := self.bottomLeft.bottomRight:
+            yield n
+
+        for posNode in self.bottom:
             if n := posNode.bottomLeft:
                 yield n
             if n := posNode.bottomRight:
                 yield n
 
+        if n := self.bottomRight.bottomLeft:
+            yield n
+
     def __repr__(self):
         return f"{self.widget.objectName()} " \
                f"[({self.topLeft.point.x()}, {self.topLeft.point.y()})," \
-               f"({self.bottomRight.point.x()}, {self.bottomRight.point.y()})]"
+               f"({self.bottomRight.point.x()}, {self.bottomRight.point.y()})] " \
+               f"<{id(self)}>"
+
+    def updateWidget(self):
+        self.widget.move(self.topLeft.point)
+        rect = QRect(self.topLeft.point, self.bottomRight.point)
+        self.widget.resize(rect.width(), rect.height())

@@ -1,2 +1,3 @@
 PyQt5==5.13
 PyQt5-stubs==5.13.1.4
+boltons

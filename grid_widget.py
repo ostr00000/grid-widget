@@ -6,16 +6,14 @@ from PyQt5.QtCore import QRect, QPoint, QSize
 from PyQt5.QtGui import QPaintEvent
 from PyQt5.QtWidgets import QWidget, QSizePolicy
 
+from graph_properties import GraphProperties
 from nodes import PositionNode, ResourceNode
-from visitor import countMaxColumns, rightBorderGen, filterType, balanceHorizontal, \
-    balanceVertical, topDownLeftRightVisitor, countMaxRows
+from visitor import filterType, BorderGen, GraphVisitor
 
 
 class GridGraph:
 
     def __init__(self, rect: QRect):
-        self.balanced = True
-        self._balanceCache = {}
         self.resourceNodes = []
         self.positionNodes = []
 
@@ -32,20 +30,31 @@ class GridGraph:
 
         self.resourceNodes.append(rn)
         self.positionNodes.extend([self.tr, self.tl, self.bl, self.br])
+        self.prop = GraphProperties(self.tl)
 
     def insert(self, widget, rect: QRect):
-        if len(self.resourceNodes) == 1 and self.resourceNodes[0].widget is None:
+        if self._isEmpty():
             self.resourceNodes[0].widget = widget
             return
 
-        rightBorder = list(filterType(rightBorderGen(self.tr), PositionNode))
+        if self.prop.maxColumnNumber > self.prop.maxRowNumber:
+            self._appendBottom(widget, rect)
+        else:
+            self._appendRight(widget, rect)
+
+        self.balance(rect)
+
+    def _isEmpty(self):
+        return len(self.resourceNodes) == 1 and self.resourceNodes[0].widget is None
+
+    def _appendRight(self, widget: QWidget, rect: QRect):
+        rightBorder = list(filterType(BorderGen.right(self.tr), PositionNode))
         tl = self.tr
         self.tr = PositionNode(rect.topRight())
         bl = self.br
         self.br = PositionNode(rect.bottomRight())
 
-        rn = ResourceNode(self.tr, tl, bl, self.br, widget=widget)
-        rn.left.extend(rightBorder[1:-1])
+        rn = ResourceNode(self.tr, tl, bl, self.br, widget=widget, left=rightBorder[1:-1])
         self.resourceNodes.append(rn)
 
         for rb in rightBorder:
@@ -55,19 +64,28 @@ class GridGraph:
         rightBorder[0].topRight = None
         rightBorder[-1].bottomRight = None
 
-        self.balance(rect)
+    def _appendBottom(self, widget: QWidget, rect: QRect):
+        bottomBorder = list(filterType(BorderGen.bottom(self.bl), PositionNode))
+        tr = self.br
+        tl = self.bl
+        self.bl = PositionNode(rect.bottomLeft())
+        self.br = PositionNode(rect.bottomRight())
+
+        rn = ResourceNode(tr, tl, self.bl, self.br, widget=widget, top=bottomBorder[1:-1])
+        self.resourceNodes.append(rn)
+
+        for rb in bottomBorder:
+            rb.bottomLeft = rn
+            rb.bottomRight = rn
+
+        bottomBorder[0].bottomLeft = None
+        bottomBorder[-1].bottomRight = None
 
     def balance(self, rect: QRect):
-        columns = countMaxColumns(self.tl)
-        maxColumn = columns[max(columns, key=columns.get)]
-        widthFactor = int(rect.width() / maxColumn)
-        balHor = balanceHorizontal(self.tl, maxColumn, columns)
+        self.prop = GraphProperties(self.tl)
 
-        rows = countMaxRows(self.tl)
-        maxRow = rows[max(rows, key=rows.get)]
-        heightFactor = int(rect.height() / maxRow)
-        balVer = balanceVertical(self.tl, maxRow, rows)
-
+        widthFactor = int(rect.width() / self.prop.maxColumnNumber)
+        heightFactor = int(rect.height() / self.prop.maxRowNumber)
         globalBottomRight = rect.bottomRight() + QPoint(1, 1)
         visited: Set[int] = set()
 
@@ -80,15 +98,15 @@ class GridGraph:
                 newPoint = globalBottomRight - q_point
                 posNode.point = newPoint
 
-        for node in topDownLeftRightVisitor(self.tl):
+        for node in GraphVisitor.topDownLeftRightVisitor(self.tl):
             nodeId = id(node)
-            right = columns[nodeId] - 1
-            left = right + balHor[nodeId]
+            right = self.prop.node2ColumnNumber[nodeId] - 1
+            left = right + self.prop.node2horizontalSize[nodeId]
             right *= widthFactor
             left *= widthFactor
 
-            bottom = rows[nodeId] - 1
-            top = bottom + balVer[nodeId]
+            bottom = self.prop.node2RowNumber[nodeId] - 1
+            top = bottom + self.prop.node2VerticalSize[nodeId]
             bottom *= heightFactor
             top *= heightFactor
 
@@ -97,10 +115,7 @@ class GridGraph:
             updatePoint(node.topLeft, top, left)
             updatePoint(node.bottomLeft, bottom, left)
 
-            width = left - right
-            height = top - bottom
-            node.widget.move(node.topLeft.point)
-            node.widget.resize(width, height)
+            node.updateWidget()
 
 
 class GridWidget(QWidget):
