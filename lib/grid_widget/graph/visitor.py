@@ -1,7 +1,7 @@
 from operator import attrgetter, methodcaller
 from typing import Iterable, Set, TypeVar, Iterator, Callable, Type, Union, Optional
 
-from nodes import PositionNode, ResourceNode
+from grid_widget.graph.nodes import PositionNode, ResourceNode
 
 T = TypeVar('T')
 NodeType = Union[PositionNode, ResourceNode]

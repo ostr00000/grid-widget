@@ -5,8 +5,8 @@ from typing import Dict, Any, Callable, Iterator, TypeVar
 
 from boltons.cacheutils import cachedproperty
 
-from nodes import PositionNode, ResourceNode
-from visitor import GraphVisitor
+from grid_widget.graph.nodes import PositionNode, ResourceNode
+from grid_widget.graph.visitor import GraphVisitor
 
 T = TypeVar('T')
 TravelDict = Dict[int, int]

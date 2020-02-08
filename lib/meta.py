@@ -2,7 +2,6 @@
 import traceback
 import types
 
-import logging
 from decorator import decorator
 from meta_wrapper import MetaWrapper
 

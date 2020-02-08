@@ -1,14 +1,11 @@
-from __future__ import annotations
-
 from typing import Set
 
-from PyQt5.QtCore import QRect, QPoint, QSize
-from PyQt5.QtGui import QPaintEvent
-from PyQt5.QtWidgets import QWidget, QSizePolicy
+from PyQt5.QtCore import QRect, QPoint
+from PyQt5.QtWidgets import QWidget
 
-from graph_properties import GraphProperties
-from nodes import PositionNode, ResourceNode
-from visitor import filterType, BorderGen, GraphVisitor
+from grid_widget.graph.nodes import PositionNode, ResourceNode
+from grid_widget.graph.properties import GraphProperties
+from grid_widget.graph.visitor import filterType, BorderGen, GraphVisitor
 
 
 class GridGraph:
@@ -116,21 +113,3 @@ class GridGraph:
             updatePoint(node.bottomLeft, bottom, left)
 
             node.updateWidget()
-
-
-class GridWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._grid = GridGraph(self.rect())
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-    def sizeHint(self) -> QSize:
-        return QSize(800, 800)
-
-    def addWidget(self, widget: QWidget):
-        widget.setParent(self)
-        self._grid.insert(widget, self.rect())
-        widget.show()
-
-    def paintEvent(self, event: QPaintEvent) -> None:
-        self._grid.balance(self.rect())
