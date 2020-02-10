@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, List
 
 from PyQt5.QtCore import QRect, QPoint
 from PyQt5.QtWidgets import QWidget
@@ -11,8 +11,8 @@ from grid_widget.graph.visitor import filterType, BorderGen, GraphVisitor
 class GridGraph:
 
     def __init__(self, rect: QRect):
-        self.resourceNodes = []
-        self.positionNodes = []
+        self.resourceNodes: List[ResourceNode] = []
+        self.positionNodes: List[PositionNode] = []
 
         self.tr = PositionNode(rect.topRight())
         self.tl = PositionNode(rect.topLeft())
@@ -29,7 +29,8 @@ class GridGraph:
         self.positionNodes.extend([self.tr, self.tl, self.bl, self.br])
         self.prop = GraphProperties(self.tl)
 
-    def insert(self, widget, rect: QRect):
+    def append(self, widget, rect: QRect):
+        assert all(rn.widget != widget for rn in self.resourceNodes), "widget already added"
         if self._isEmpty():
             self.resourceNodes[0].widget = widget
             return
@@ -113,3 +114,81 @@ class GridGraph:
             updatePoint(node.bottomLeft, bottom, left)
 
             node.updateWidget()
+
+    def remove(self, widget: QWidget):
+        resourceNodes = [rn for rn in self.resourceNodes if rn.widget == widget]
+        assert resourceNodes, "Widget does not belong to grid widget"
+        assert len(resourceNodes) != 1, "found multiple resource nodes with same widget"
+        resourceNode = resourceNodes[0]
+
+        resourceNode.unpinOthersRelations()
+        if resourceNode.hasStrictHorizontalNeighbor():
+            self.stretchHorizontal(resourceNode)
+        else:
+            self.stretchVertical(resourceNode)
+
+    def stretchHorizontal(self, resourceNode: ResourceNode):
+        neighbors = resourceNode.strictHorizontalNeighbors()
+        resizeFactor = len(neighbors) - 1
+
+        resourceNode.topRight.topLeft
+
+
+class StretchWrapper:
+    def __init__(self, pos: PositionNode):
+        self.pos = pos
+
+    def _isCorner(self):
+        none = len([n for n in (self.pos.topLeft, self.pos.bottomLeft,
+                                self.pos.bottomRight, self.pos.topRight)
+                    if n is None])
+        return none == 3
+
+    def _hasHorizontalBoard(self):
+        return self.pos.topLeft == self.pos.topRight or self.pos.bottomLeft == self.pos.bottomRight
+
+    def _hasVerticalBoard(self):
+        return self.pos.topRight == self.pos.bottomRight or self.pos.topLeft == self.pos.bottomLeft
+
+    def canMoveHorizontal(self):
+        if self._isCorner:
+            return False
+
+        if self._hasHorizontalBoard():
+            return True
+
+        if self._hasVerticalBoard():
+            return False
+
+        return True  # all nodes are different
+
+    def canMoveVertical(self):
+        if self._isCorner:
+            return False
+
+        if self._hasVerticalBoard():
+            return True
+
+        if self._hasHorizontalBoard():
+            return False
+
+        return True  # all nodes are different
+
+    @property
+    def h(self):
+        return self.canMoveHorizontal()
+
+    @property
+    def v(self):
+        return self.canMoveVertical()
+
+
+class Stretch:
+    def __init__(self, res: ResourceNode):
+        self.res = res
+
+    def calc(self):
+        topRight = StretchWrapper(self.res.topRight)
+        topLeft = StretchWrapper(self.res.topLeft)
+        bottomLeft = StretchWrapper(self.res.bottomLeft)
+        bottomRight = StretchWrapper(self.res.bottomRight)

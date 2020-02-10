@@ -77,3 +77,56 @@ class ResourceNode:
         self.widget.move(self.topLeft.point)
         rect = QRect(self.topLeft.point, self.bottomRight.point)
         self.widget.resize(rect.width(), rect.height())
+
+    def unpinOthersRelations(self):
+        """Remove from all related objects reference to self, self still keep that references"""
+        self.topRight.bottomLeft = None
+        self.topLeft.bottomRight = None
+        self.bottomLeft.topRight = None
+        self.bottomRight.topLeft = None
+
+        for otherRelations in (self.top, self.left, self.bottom, self.right):
+            for pn in otherRelations:
+                if pn.topRight == self:
+                    pn.topRight = None
+                if pn.topLeft == self:
+                    pn.topLeft = None
+                if pn.bottomLeft == self:
+                    pn.bottomLeft = None
+                if pn.bottomRight == self:
+                    pn.bottomRight = None
+
+    def hasStrictHorizontalNeighbor(self, left=True, right=True):
+        """strict neighbors must have two common positionNodes"""
+        if left:
+            if otherResource := self.topLeft.bottomLeft:
+                if self.topLeft == otherResource.topRight and \
+                        self.bottomLeft == otherResource.bottomRight:
+                    return True
+
+        if right:
+            if otherResource := self.topRight.bottomRight:
+                if self.topRight == otherResource.topLeft \
+                        and self.bottomRight == otherResource.bottomLeft:
+                    return True
+
+        return False
+
+    def strictHorizontalNeighbors(self) -> List[ResourceNode]:
+        """self is in middle, split left and right neighbors"""
+        foundNodes = []
+
+        node = self
+        while node.hasStrictHorizontalNeighbor(right=False):
+            node = self.topLeft.bottomLeft
+            foundNodes.append(node)
+
+        foundNodes.reverse()
+        foundNodes.append(self)
+
+        node = self
+        while node.hasStrictHorizontalNeighbor(left=False):
+            node = self.topRight.bottomRight
+            foundNodes.append(node)
+
+        return foundNodes

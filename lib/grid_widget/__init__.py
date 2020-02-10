@@ -18,7 +18,7 @@ class GridWidget(QWidget):
 
     def addWidget(self, widget: QWidget):
         widget.setParent(self)
-        self._grid.insert(widget, self.rect())
+        self._grid.append(widget, self.rect())
         widget.show()
 
     def paintEvent(self, event: QPaintEvent) -> None:
