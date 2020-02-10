@@ -4,7 +4,7 @@ from random import randint
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, \
     QFrame
 
-from grid_widget.grid_widget import GridWidget
+from grid_widget.__init__ import GridWidget
 
 
 class MyWidget(QWidget):
