@@ -1,9 +1,10 @@
-from typing import TypeVar, Tuple, Callable, Iterator
+from typing import TypeVar, Tuple, Callable, Iterable
 
+from PyQt5.QtCore import QRect
 from boltons.cacheutils import cachedproperty
 
 from grid_widget.graph.nodes import ResourceNode, PositionNode
-from grid_widget.graph.visitor import StrictLineGen, filterType, GraphVisitor
+from grid_widget.graph.visitor import Filter, GraphVisitor, BorderGen
 
 
 class PositionNodeProperties:
@@ -69,43 +70,39 @@ class Stretcher:
         bottomRight = PositionNodeProperties(self.res.bottomRight)
 
         if topRight.h and topLeft.h and bottomLeft.h and bottomRight.h:
-            self.horizontal(left=True, right=True)
+            self._horizontal(left=True, right=True)
         elif topRight.v and topLeft.v and bottomLeft.v and bottomRight.v:
-            self.vertical(top=True, bottom=True)
+            self._vertical(top=True, bottom=True)
 
         elif topRight.h and bottomRight.h:
-            self.horizontal(right=True)
-        elif topLeft.h and bottomRight.h:
-            self.horizontal(left=True)
+            self._horizontal(right=True)
+        elif topLeft.h and bottomLeft.h:
+            self._horizontal(left=True)
         elif topRight.v and topLeft.v:
-            self.vertical(top=True)
+            self._vertical(top=True)
         elif bottomRight.v and bottomLeft.v:
-            self.vertical(bottom=True)
+            self._vertical(bottom=True)
 
-    def horizontal(self, left=False, right=False):
+    def _horizontal(self, left=False, right=False):
         if left:
-            leftTopPoints = [self.res.topLeft] + list(filterType(
-                StrictLineGen.rightToLeft(self.res.topLeft),
-                PositionNode))
-            leftBottomPoints = [self.res.bottomLeft] + list(filterType(
-                StrictLineGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
-                PositionNode))
+            leftTopPoints = list(Filter.byPosY(
+                BorderGen.rightToLeft(self.res.topLeft), self.res.topLeft.point.y()))
+            leftBottomPoints = list(Filter.byPosY(
+                BorderGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
+                self.res.bottomLeft.point.y()))
             lTop, lBot = longestCommonValues(
                 leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
 
-            toResize = []
-            for i in filterType(GraphVisitor.topDownLeftRightVisitor(lTop), ResourceNode):
-                if i.topLeft.point.x() >= self.res.topLeft.point.x():
-                    # TODO maybe send to generator to stop
-                    continue
-                if i.topLeft == lBot:
-                    break
-                toResize.append(i)
+            toResize = list(Filter.byRect(
+                GraphVisitor.topDownLeftRightVisitor(lTop),
+                QRect(lTop.point, self.res.bottomLeft.point)))
+
+
 
             if right:
                 raise NotImplementedError
 
-    def vertical(self, top=False, bottom=False):
+    def _vertical(self, top=False, bottom=False):
         raise NotImplementedError
 
 
@@ -120,8 +117,10 @@ def cmpY(pn1: PositionNode, pn2: PositionNode):
 T = TypeVar('T')
 
 
-def longestCommonValues(a: Iterator[T], b: Iterator[T],
+def longestCommonValues(a: Iterable[T], b: Iterable[T],
                         cmpFun: Callable[[T, T], int]) -> Tuple[T, T]:
+    a = iter(a)
+    b = iter(b)
     longestA = next(a)
     longestB = next(b)
     assert 0 == cmpFun(longestA, longestB), "First pair must be equal"
