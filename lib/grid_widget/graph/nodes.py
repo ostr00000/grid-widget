@@ -66,29 +66,35 @@ class ResourceNode:
         self.bottomRight.topLeft = self
 
     def rightPositionsGen(self) -> Iterable[ResourceNode]:
-        if n := self.topRight.bottomRight:
-            yield n
+        return self._posGen(self.topRight, self.right, self.bottomRight,
+                            PosAttributes.bottomRight, PosAttributes.topRight)
 
-        for posNode in self.right:
-            if n := posNode.topRight:
-                yield n
-            if n := posNode.bottomRight:
-                yield n
-
-        if n := self.bottomRight.topRight:
-            yield n
+    def leftPositionsGen(self) -> Iterable[ResourceNode]:
+        return self._posGen(self.topLeft, self.left, self.bottomLeft,
+                            PosAttributes.bottomLeft, PosAttributes.topLeft)
 
     def bottomPositionGen(self) -> Iterable[ResourceNode]:
-        if n := self.bottomLeft.bottomRight:
+        return self._posGen(self.bottomLeft, self.bottom, self.bottomRight,
+                            PosAttributes.bottomRight, PosAttributes.bottomLeft)
+
+    def topPositionGen(self) -> Iterable[ResourceNode]:
+        return self._posGen(self.topLeft, self.top, self.topRight,
+                            PosAttributes.topRight, PosAttributes.topLeft)
+
+    @staticmethod
+    def _posGen(pointFirst: PositionNode, points: List[PositionNode],
+                pointSecond: PositionNode, posAttrFirst: PosAttr,
+                posAttrSecond: PosAttr) -> Iterable[ResourceNode]:
+        if n := posAttrFirst.attrGetter(pointFirst):
             yield n
 
-        for posNode in self.bottom:
-            if n := posNode.bottomLeft:
+        for posNode in points:
+            if n := posAttrSecond.attrGetter(posNode):
                 yield n
-            if n := posNode.bottomRight:
+            if n := posAttrFirst.attrGetter(posNode):
                 yield n
 
-        if n := self.bottomRight.bottomLeft:
+        if n := posAttrSecond.attrGetter(pointSecond):
             yield n
 
     def __repr__(self):

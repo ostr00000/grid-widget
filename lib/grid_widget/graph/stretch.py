@@ -1,7 +1,9 @@
+from typing import TypeVar, Tuple, Callable, Iterator
+
 from boltons.cacheutils import cachedproperty
 
 from grid_widget.graph.nodes import ResourceNode, PositionNode
-from grid_widget.graph.visitor import StrictLineGen
+from grid_widget.graph.visitor import StrictLineGen, filterType, GraphVisitor
 
 
 class PositionNodeProperties:
@@ -82,8 +84,58 @@ class Stretcher:
 
     def horizontal(self, left=False, right=False):
         if left:
-            top = StrictLineGen.rightToLeft(self.res.topLeft, walkTopSide=False)
-            bottom = StrictLineGen.rightToLeft(self.res.bottomLeft)
+            leftTopPoints = [self.res.topLeft] + list(filterType(
+                StrictLineGen.rightToLeft(self.res.topLeft),
+                PositionNode))
+            leftBottomPoints = [self.res.bottomLeft] + list(filterType(
+                StrictLineGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
+                PositionNode))
+            lTop, lBot = longestCommonValues(
+                leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
+
+            toResize = []
+            for i in filterType(GraphVisitor.topDownLeftRightVisitor(lTop), ResourceNode):
+                if i.topLeft.point.x() >= self.res.topLeft.point.x():
+                    # TODO maybe send to generator to stop
+                    continue
+                if i.topLeft == lBot:
+                    break
+                toResize.append(i)
+
+            if right:
+                raise NotImplementedError
 
     def vertical(self, top=False, bottom=False):
-        pass
+        raise NotImplementedError
+
+
+def cmpX(pn1: PositionNode, pn2: PositionNode):
+    return pn1.point.x() - pn2.point.x()
+
+
+def cmpY(pn1: PositionNode, pn2: PositionNode):
+    return pn1.point.y() - pn2.point.y()
+
+
+T = TypeVar('T')
+
+
+def longestCommonValues(a: Iterator[T], b: Iterator[T],
+                        cmpFun: Callable[[T, T], int]) -> Tuple[T, T]:
+    longestA = next(a)
+    longestB = next(b)
+    assert 0 == cmpFun(longestA, longestB), "First pair must be equal"
+
+    try:
+        while True:
+            nextA = next(a)
+            nextB = next(b)
+            while (c := cmpFun(nextA, nextB)) != 0:
+                if c < 0:
+                    nextA = next(a)
+                else:
+                    nextB = next(b)
+            longestA, longestB = nextA, nextB
+
+    except StopIteration:
+        return longestA, longestB

@@ -72,17 +72,18 @@ class BorderGen:
 
 class StrictLineGen(BorderGen):
     @staticmethod
-    def _nodeGen(startNode: Node, resFun: PosAttr, posFun: PosAttr) -> Iterable[Node]:
+    def _nodeGen(startNode: PositionNode, resFun: PosAttr, posFun: PosAttr) \
+            -> Iterable[PositionNode]:
         prev = startNode
         for node in BorderGen._nodeGen(startNode, resFun, posFun):
             if isinstance(node, ResourceNode):
                 rev = resFun.opposite.attrGetter(node)
                 if rev == prev:
                     yield node
-
+            elif isinstance(node, PositionNode):
+                prev = node
             else:
-                yield node
-            prev = node
+                raise ValueError
 
 
 class GraphVisitor:
