@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional, List, Iterable
+from operator import attrgetter
+from typing import Optional, List, Iterable, Callable
 
 from PyQt5.QtCore import QPoint, QRect
 from PyQt5.QtWidgets import QWidget
@@ -9,6 +10,29 @@ from PyQt5.QtWidgets import QWidget
 @dataclass
 class Node:
     pass
+
+
+@dataclass
+class PosAttr:
+    name: str
+    opposite: PosAttr = None
+    attrGetter: Callable[[Node], Node] = None
+
+    def __post_init__(self):
+        self.attrGetter = attrgetter(self.name)
+
+    def __str__(self):
+        return self.name
+
+
+class PosAttributes:
+    topRight = PosAttr('topRight')
+    bottomLeft = PosAttr('bottomLeft', topRight)
+    topRight.opposite = bottomLeft
+
+    topLeft = PosAttr('topLeft')
+    bottomRight = PosAttr('bottomRight', topLeft)
+    topLeft.opposite = bottomRight
 
 
 @dataclass

@@ -4,7 +4,7 @@ from PyQt5.QtCore import QSize
 from PyQt5.QtGui import QPaintEvent
 from PyQt5.QtWidgets import QWidget, QSizePolicy
 
-from grid_widget.graph.__init__ import GridGraph
+from grid_widget.graph.grid_graph import GridGraph
 
 
 class GridWidget(QWidget):
