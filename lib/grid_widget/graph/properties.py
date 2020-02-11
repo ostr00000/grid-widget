@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from functools import reduce, partial
 from operator import methodcaller
-from typing import Dict, Any, Callable, Iterator, TypeVar
+from typing import Dict, Any, Callable, Iterator, TypeVar, List
 
 from boltons.cacheutils import cachedproperty
 
@@ -20,8 +20,14 @@ class _BalanceStruct:
 
 
 class GraphProperties:
-    def __init__(self, topLeft: PositionNode):
+    def __init__(self, topLeft: PositionNode, filterNodes: List[ResourceNode] = None):
         self.topLeft = topLeft
+        self._filterNodes = filterNodes
+
+    def acceptNode(self, node: ResourceNode):
+        if self._filterNodes is None:
+            return True
+        return node in self._filterNodes
 
     @cachedproperty
     def node2ColumnNumber(self) -> TravelDict:
@@ -75,12 +81,14 @@ class GraphProperties:
             _BalanceStruct(self.maxRowNumber, self.node2RowNumber),
         ).balanced
 
-    @staticmethod
-    def _balance(acc: _BalanceStruct, node: ResourceNode,
+    def _balance(self, acc: _BalanceStruct, node: ResourceNode,
                  childrenNodeFun: Callable[[ResourceNode], Iterator[ResourceNode]]
                  ) -> _BalanceStruct:
         myColumn = acc.columns[id(node)]
         for rp in childrenNodeFun(node):
+            if not self.acceptNode(rp):
+                continue
+
             childColumn = acc.columns[id(rp)]
             diff = myColumn - childColumn
             acc.balanced[id(rp)] = diff
