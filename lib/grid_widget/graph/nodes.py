@@ -1,15 +1,18 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from operator import attrgetter
-from typing import Optional, List, Iterable, Callable
+from typing import Optional, List, Iterable, Callable, Iterator
 
 from PyQt5.QtCore import QPoint, QRect
 from PyQt5.QtWidgets import QWidget
 
 
-@dataclass
 class Node:
-    pass
+    topRight: Node
+    topLeft: Node
+    bottomLeft: Node
+    bottomRight: Node
 
 
 @dataclass
@@ -44,9 +47,12 @@ class PositionNode(Node):
     bottomLeft: Optional[ResourceNode] = None
     bottomRight: Optional[ResourceNode] = None
 
+    def __iter__(self) -> Iterator[Optional[ResourceNode]]:
+        return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
+
 
 @dataclass
-class ResourceNode:
+class ResourceNode(Node):
     topRight: PositionNode
     topLeft: PositionNode
     bottomLeft: PositionNode
@@ -64,6 +70,9 @@ class ResourceNode:
         self.topLeft.bottomRight = self
         self.bottomLeft.topRight = self
         self.bottomRight.topLeft = self
+
+    def __iter__(self) -> Iterator[PositionNode]:
+        return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
 
     def rightPositionsGen(self) -> Iterable[ResourceNode]:
         return self._posGen(self.topRight, self.right, self.bottomRight,
