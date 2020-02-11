@@ -1,15 +1,39 @@
 from operator import methodcaller
 from typing import Iterable, Set, TypeVar, Iterator, Callable, Type
 
+from PyQt5.QtCore import QRect
+
 from grid_widget.graph.nodes import PositionNode, ResourceNode, PosAttributes, Node, PosAttr
 
 T = TypeVar('T')
 
 
-def filterType(iterable: Iterable, types: Type[T]) -> Iterable[T]:
-    for i in iterable:
-        if isinstance(i, types):
+class Filter:
+    @staticmethod
+    def byType(iterable: Iterable, types: Type[T]) -> Iterable[T]:
+        for i in iterable:
+            if isinstance(i, types):
+                yield i
+
+    @staticmethod
+    def byPosX(iterable: Iterable[Node], posX: int) -> Iterable[PositionNode]:
+        for i in Filter.byType(iterable, PositionNode):
+            if i.point.x() != posX:
+                break
             yield i
+
+    @staticmethod
+    def byPosY(iterable: Iterable[Node], posY: int) -> Iterable[PositionNode]:
+        for i in Filter.byType(iterable, PositionNode):
+            if i.point.y() != posY:
+                break
+            yield i
+
+    @staticmethod
+    def byRect(resNodes: Iterable[ResourceNode], rect: QRect):
+        for resNode in resNodes:
+            if all(rect.contains(posNode.point) for posNode in resNode):
+                yield resNode
 
 
 class BorderGen:
@@ -70,33 +94,17 @@ class BorderGen:
             resNode = resFun.attrGetter(posNode)
 
 
-class StrictLineGen(BorderGen):
-    @staticmethod
-    def _nodeGen(startNode: PositionNode, resFun: PosAttr, posFun: PosAttr) \
-            -> Iterable[PositionNode]:
-        prev = startNode
-        for node in BorderGen._nodeGen(startNode, resFun, posFun):
-            if isinstance(node, ResourceNode):
-                rev = resFun.opposite.attrGetter(node)
-                if rev == prev:
-                    yield node
-            elif isinstance(node, PositionNode):
-                prev = node
-            else:
-                raise ValueError
-
-
 class GraphVisitor:
     @staticmethod
     def topDownLeftRightVisitor(topLeft: PositionNode):
         yield from GraphVisitor._graphVisitor(
-            filterType(BorderGen.topToDown(topLeft), ResourceNode),
+            Filter.byType(BorderGen.topToDown(topLeft), ResourceNode),
             methodcaller('rightPositionsGen'))
 
     @staticmethod
     def leftRightTopDown(topLeft: PositionNode):
         yield from GraphVisitor._graphVisitor(
-            filterType(BorderGen.leftToRight(topLeft, walkTopSide=False), ResourceNode),
+            Filter.byType(BorderGen.leftToRight(topLeft, walkTopSide=False), ResourceNode),
             methodcaller('bottomPositionGen'))
 
     @staticmethod

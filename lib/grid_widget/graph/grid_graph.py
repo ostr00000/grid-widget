@@ -5,7 +5,8 @@ from PyQt5.QtWidgets import QWidget
 
 from grid_widget.graph.nodes import PositionNode, ResourceNode
 from grid_widget.graph.properties import GraphProperties
-from grid_widget.graph.visitor import filterType, BorderGen, GraphVisitor
+from grid_widget.graph.stretch import Stretcher
+from grid_widget.graph.visitor import Filter, BorderGen, GraphVisitor
 
 
 class GridGraph:
@@ -46,7 +47,7 @@ class GridGraph:
         return len(self.resourceNodes) == 1 and self.resourceNodes[0].widget is None
 
     def _appendRight(self, widget: QWidget, rect: QRect):
-        rightBorder = list(filterType(
+        rightBorder = list(Filter.byType(
             BorderGen.topToDown(self.tr, walkRightSide=False), PositionNode))
 
         tl = self.tr
@@ -65,7 +66,7 @@ class GridGraph:
         rightBorder[-1].bottomRight = None
 
     def _appendBottom(self, widget: QWidget, rect: QRect):
-        bottomBorder = list(filterType(
+        bottomBorder = list(Filter.byType(
             BorderGen.leftToRight(self.bl), PositionNode))
 
         tr = self.br
@@ -122,15 +123,8 @@ class GridGraph:
     def remove(self, widget: QWidget):
         resourceNodes = [rn for rn in self.resourceNodes if rn.widget == widget]
         assert resourceNodes, "Widget does not belong to grid widget"
-        assert len(resourceNodes) != 1, "found multiple resource nodes with same widget"
+        assert len(resourceNodes) == 1, "found multiple resource nodes with same widget"
         resourceNode = resourceNodes[0]
 
-        resourceNode.unpinOthersRelations()
-        if resourceNode.hasStrictHorizontalNeighbor():
-            self.stretchHorizontal(resourceNode)
-        else:
-            self.stretchVertical(resourceNode)
-
-    def stretchHorizontal(self, resourceNode: ResourceNode):
-        neighbors = resourceNode.strictHorizontalNeighbors()
-        resizeFactor = len(neighbors) - 1
+        stretcher = Stretcher(resourceNode)
+        stretcher.stretch()
