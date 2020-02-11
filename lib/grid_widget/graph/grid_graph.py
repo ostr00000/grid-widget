@@ -3,6 +3,7 @@ from typing import Set, List
 from PyQt5.QtCore import QRect, QPoint
 from PyQt5.QtWidgets import QWidget
 
+from grid_widget.graph.distributor import Distributor
 from grid_widget.graph.nodes import PositionNode, ResourceNode
 from grid_widget.graph.properties import GraphProperties
 from grid_widget.graph.stretch import Stretcher
@@ -41,7 +42,7 @@ class GridGraph:
         else:
             self._appendRight(widget, rect)
 
-        self.balance(rect)
+        Distributor(self.tl).distribute(rect)
 
     def _isEmpty(self):
         return len(self.resourceNodes) == 1 and self.resourceNodes[0].widget is None
@@ -83,42 +84,6 @@ class GridGraph:
 
         bottomBorder[0].bottomLeft = None
         bottomBorder[-1].bottomRight = None
-
-    def balance(self, rect: QRect):
-        self.prop = GraphProperties(self.tl)
-
-        widthFactor = int(rect.width() / self.prop.maxColumnNumber)
-        heightFactor = int(rect.height() / self.prop.maxRowNumber)
-        globalBottomRight = rect.bottomRight() + QPoint(1, 1)
-        visited: Set[int] = set()
-
-        def updatePoint(posNode: PositionNode, y: int, x: int):
-            posNodeId = id(posNode)
-            if posNodeId not in visited:
-                visited.add(posNodeId)
-
-                q_point = QPoint(x, y)
-                newPoint = globalBottomRight - q_point
-                posNode.point = newPoint
-
-        for node in GraphVisitor.topDownLeftRightVisitor(self.tl):
-            nodeId = id(node)
-            right = self.prop.node2ColumnNumber[nodeId] - 1
-            left = right + self.prop.node2horizontalSize[nodeId]
-            right *= widthFactor
-            left *= widthFactor
-
-            bottom = self.prop.node2RowNumber[nodeId] - 1
-            top = bottom + self.prop.node2VerticalSize[nodeId]
-            bottom *= heightFactor
-            top *= heightFactor
-
-            updatePoint(node.topRight, top, right)
-            updatePoint(node.bottomRight, bottom, right)
-            updatePoint(node.topLeft, top, left)
-            updatePoint(node.bottomLeft, bottom, left)
-
-            node.updateWidget()
 
     def remove(self, widget: QWidget):
         resourceNodes = [rn for rn in self.resourceNodes if rn.widget == widget]

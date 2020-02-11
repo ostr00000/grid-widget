@@ -4,6 +4,7 @@ from PyQt5.QtCore import QSize
 from PyQt5.QtGui import QPaintEvent
 from PyQt5.QtWidgets import QWidget, QSizePolicy
 
+from grid_widget.graph.distributor import Distributor
 from grid_widget.graph.grid_graph import GridGraph
 
 
@@ -26,4 +27,4 @@ class GridWidget(QWidget):
         widget.setParent(None)
 
     def paintEvent(self, event: QPaintEvent) -> None:
-        self._grid.balance(self.rect())
+        Distributor(self._grid.tl).distribute(self.rect())
