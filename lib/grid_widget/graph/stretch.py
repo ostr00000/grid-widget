@@ -3,6 +3,7 @@ from typing import TypeVar, Tuple, Callable, Iterable
 from PyQt5.QtCore import QRect
 from boltons.cacheutils import cachedproperty
 
+from grid_widget import Distributor
 from grid_widget.graph.nodes import ResourceNode, PositionNode
 from grid_widget.graph.visitor import Filter, GraphVisitor, BorderGen
 
@@ -97,7 +98,9 @@ class Stretcher:
                 GraphVisitor.topDownLeftRightVisitor(lTop),
                 QRect(lTop.point, self.res.bottomLeft.point)))
 
-
+            totalRect = QRect(lTop.point, self.res.bottomRight.point)
+            self.res.unpinOthersRelations()
+            Distributor(lTop, filterNodes=toResize).distribute(totalRect)
 
             if right:
                 raise NotImplementedError

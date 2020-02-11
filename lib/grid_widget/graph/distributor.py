@@ -1,21 +1,21 @@
-from typing import Set
+from typing import Set, List
 
 from PyQt5.QtCore import QRect, QPoint
 
-from grid_widget.graph.nodes import PositionNode
+from grid_widget.graph.nodes import PositionNode, ResourceNode
 from grid_widget.graph.properties import GraphProperties
 from grid_widget.graph.visitor import GraphVisitor
 
 
 class Distributor:
-    def __init__(self, topLeft: PositionNode):
+    def __init__(self, topLeft: PositionNode, filterNodes: List[ResourceNode] = None):
         self.topLeft = topLeft
-        self.prop = GraphProperties(self.topLeft)
+        self.prop = GraphProperties(self.topLeft, filterNodes=filterNodes)
 
     def distribute(self, rect: QRect):
         widthFactor = int(rect.width() / self.prop.maxColumnNumber)
         heightFactor = int(rect.height() / self.prop.maxRowNumber)
-        globalBottomRight = rect.bottomRight() + QPoint(1, 1)
+        globalBottomRight = rect.bottomRight() + QPoint(1, 1)  # TODO maybe better not add
         visited: Set[int] = set()
 
         def updatePoint(posNode: PositionNode, y: int, x: int):
