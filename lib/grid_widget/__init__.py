@@ -21,5 +21,9 @@ class GridWidget(QWidget):
         self._grid.append(widget, self.rect())
         widget.show()
 
+    def removeWidget(self, widget: QWidget):
+        self._grid.remove(widget)
+        widget.setParent(None)
+
     def paintEvent(self, event: QPaintEvent) -> None:
         self._grid.balance(self.rect())

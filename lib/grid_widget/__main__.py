@@ -1,5 +1,6 @@
 import logging
 from random import randint
+from typing import Optional
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, \
     QFrame
@@ -12,6 +13,7 @@ class MyWidget(QWidget):
         super().__init__(parent)
         self.verticalLayout = QVBoxLayout(self)
         self.num = 0
+        self.lastWidget: Optional[QWidget] = None
 
         self.button = QPushButton("Create widget")
         self.button.clicked.connect(self.onButtonClicked)
@@ -20,8 +22,11 @@ class MyWidget(QWidget):
         self.gridWidget = GridWidget(self)
         self.verticalLayout.addWidget(self.gridWidget)
 
+        # tests
         self.onButtonClicked()
         self.onButtonClicked()
+        assert isinstance(self.lastWidget, QWidget)
+        self.gridWidget.removeWidget(self.lastWidget)
 
     def onButtonClicked(self):
         self.num += 1
@@ -31,6 +36,7 @@ class MyWidget(QWidget):
         color = (randint(0, 255), randint(0, 255), randint(0, 255))
         frame.setStyleSheet("background-color: rgb({},{},{});".format(*color))
         self.gridWidget.addWidget(frame)
+        self.lastWidget = frame
 
 
 def main():
