@@ -50,6 +50,12 @@ class PositionNode(Node):
     def __iter__(self) -> Iterator[Optional[ResourceNode]]:
         return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
 
+    def __str__(self):
+        return f"{self.point.x()},{self.point.y()}"
+
+    def __len__(self):
+        return sum((1 for rn in self if rn is not None), 0)
+
 
 @dataclass
 class ResourceNode(Node):
@@ -105,6 +111,9 @@ class ResourceNode(Node):
 
         if n := posAttrSecond.attrGetter(pointSecond):
             yield n
+
+    def __str__(self):
+        return self.widget.objectName()
 
     def __repr__(self):
         return f"{self.widget.objectName()} " \

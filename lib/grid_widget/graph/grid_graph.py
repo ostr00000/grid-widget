@@ -42,7 +42,12 @@ class GridGraph:
         else:
             self._appendRight(widget, rect)
 
-        Distributor(self.tl).distribute(rect)
+        self.refreshPositions(rect)
+
+    def refreshPositions(self, rect: QRect):
+        dist = Distributor(self.tl)
+        dist.distribute(rect)
+        self.prop = dist.prop
 
     def _isEmpty(self):
         return len(self.resourceNodes) == 1 and self.resourceNodes[0].widget is None
@@ -50,11 +55,13 @@ class GridGraph:
     def _appendRight(self, widget: QWidget, rect: QRect):
         rightBorder = list(Filter.byType(
             BorderGen.topToDown(self.tr, walkRightSide=False), PositionNode))
+        assert len(rightBorder) >= 2
 
         tl = self.tr
         self.tr = PositionNode(rect.topRight())
         bl = self.br
         self.br = PositionNode(rect.bottomRight())
+        self.positionNodes.extend((self.tr, self.br))
 
         rn = ResourceNode(self.tr, tl, bl, self.br, widget=widget, left=rightBorder[1:-1])
         self.resourceNodes.append(rn)
@@ -69,6 +76,7 @@ class GridGraph:
     def _appendBottom(self, widget: QWidget, rect: QRect):
         bottomBorder = list(Filter.byType(
             BorderGen.leftToRight(self.bl), PositionNode))
+        assert len(bottomBorder) >= 2
 
         tr = self.br
         tl = self.bl
@@ -93,3 +101,9 @@ class GridGraph:
 
         stretcher = Stretcher(resourceNode)
         stretcher.stretch()
+
+        for posNode in resourceNode:
+            if len(posNode) == 0:
+                self.positionNodes.remove(posNode)
+
+        self.resourceNodes.remove(resourceNode)

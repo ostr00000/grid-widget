@@ -27,4 +27,5 @@ class GridWidget(QWidget):
         widget.setParent(None)
 
     def paintEvent(self, event: QPaintEvent) -> None:
-        Distributor(self._grid.tl).distribute(self.rect())
+        self._grid.refreshPositions(self.rect())
+        self.renderGraph()
