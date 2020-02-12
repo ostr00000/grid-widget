@@ -1,10 +1,10 @@
-from typing import TypeVar, Tuple, Callable, Iterable
+from typing import TypeVar, Tuple, Callable, Iterable, Optional
 
 from PyQt5.QtCore import QRect
 from boltons.cacheutils import cachedproperty
 
 from grid_widget import Distributor
-from grid_widget.graph.nodes import ResourceNode, PositionNode
+from grid_widget.graph.nodes import ResourceNode, PositionNode, PositionContainer
 from grid_widget.graph.visitor import Filter, GraphVisitor, BorderGen
 
 
@@ -63,6 +63,7 @@ class Stretcher:
         :param res: Removed node
         """
         self.res = res
+        self.newCorners: Optional[PositionContainer] = None
 
     def stretch(self):
         topRight = PositionNodeProperties(self.res.topRight)
@@ -100,7 +101,10 @@ class Stretcher:
 
             totalRect = QRect(lTop.point, self.res.bottomRight.point)
             self.res.unpinOthersRelations()
-            Distributor(lTop, filterNodes=toResize).distribute(totalRect)
+
+            self.newCorners = PositionContainer(
+                self.res.topRight, lTop, lBot, self.res.bottomRight)
+            Distributor(self.newCorners, filterNodes=toResize).distribute(totalRect)
 
             if right:
                 raise NotImplementedError

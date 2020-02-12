@@ -2,15 +2,15 @@ from typing import Set, List
 
 from PyQt5.QtCore import QRect, QPoint
 
-from grid_widget.graph.nodes import PositionNode, ResourceNode
+from grid_widget.graph.nodes import PositionNode, ResourceNode, PositionContainer
 from grid_widget.graph.properties import GraphProperties
 from grid_widget.graph.visitor import GraphVisitor
 
 
 class Distributor:
-    def __init__(self, topLeft: PositionNode, filterNodes: List[ResourceNode] = None):
-        self.topLeft = topLeft
-        self.prop = GraphProperties(self.topLeft, filterNodes=filterNodes)
+    def __init__(self, posCon: PositionContainer, filterNodes: List[ResourceNode] = None):
+        self.posCon = posCon
+        self.prop = GraphProperties(self.posCon, filterNodes=filterNodes)
 
     def distribute(self, rect: QRect):
         widthFactor = int(rect.width() / self.prop.maxColumnNumber)
@@ -27,7 +27,7 @@ class Distributor:
                 newPoint = globalBottomRight - q_point
                 posNode.point = newPoint
 
-        for node in GraphVisitor.topDownLeftRightVisitor(self.topLeft):
+        for node in GraphVisitor.topDownLeftRightVisitor(self.posCon.topLeft):
             nodeId = id(node)
             right = self.prop.node2ColumnNumber[nodeId] - 1
             left = right + self.prop.node2horizontalSize[nodeId]
@@ -40,7 +40,6 @@ class Distributor:
             bottom *= heightFactor
             top *= heightFactor
             top -= 1
-
 
             updatePoint(node.topRight, top, right)
             updatePoint(node.bottomRight, bottom, right)

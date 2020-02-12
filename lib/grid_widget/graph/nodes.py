@@ -1,18 +1,26 @@
 from __future__ import annotations
 
+from abc import ABC
+from collections import Iterable
 from dataclasses import dataclass, field
 from operator import attrgetter
-from typing import Optional, List, Iterable, Callable, Iterator
+from typing import Optional, List, Callable, Iterator
 
 from PyQt5.QtCore import QPoint, QRect
 from PyQt5.QtWidgets import QWidget
 
 
-class Node:
+class Node(Iterable, ABC):
     topRight: Node
     topLeft: Node
     bottomLeft: Node
     bottomRight: Node
+
+    def __contains__(self, item):
+        return item in (self.topRight, self.topLeft, self.bottomLeft, self.bottomRight)
+
+    def __len__(self):
+        return sum((1 for rn in self if rn is not None), 0)
 
 
 @dataclass
@@ -53,17 +61,38 @@ class PositionNode(Node):
     def __str__(self):
         return f"{self.point.x()},{self.point.y()}"
 
-    def __len__(self):
-        return sum((1 for rn in self if rn is not None), 0)
-
 
 @dataclass
-class ResourceNode(Node):
+class PositionContainer(Node):
     topRight: PositionNode
     topLeft: PositionNode
     bottomLeft: PositionNode
     bottomRight: PositionNode
 
+    @classmethod
+    def fromRect(cls, rect: QRect):
+        return PositionContainer(
+            PositionNode(rect.topRight()),
+            PositionNode(rect.topLeft()),
+            PositionNode(rect.bottomLeft()),
+            PositionNode(rect.bottomRight()))
+
+    def __iter__(self) -> Iterator[PositionNode]:
+        return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
+
+    def update(self, old: PositionNode, new: PositionNode):
+        if old == self.topRight:
+            self.topRight = new
+        elif old == self.topLeft:
+            self.topLeft = new
+        elif old == self.bottomLeft:
+            self.bottomLeft = new
+        elif old == self.bottomRight:
+            self.bottomRight = new
+
+
+@dataclass
+class ResourceNode(PositionContainer):
     widget: Optional[QWidget] = None
 
     top: List[PositionNode] = field(default_factory=list)
@@ -71,14 +100,16 @@ class ResourceNode(Node):
     bottom: List[PositionNode] = field(default_factory=list)
     right: List[PositionNode] = field(default_factory=list)
 
+    @classmethod
+    def fromPositionContainer(cls, posCon: PositionContainer):
+        return ResourceNode(posCon.topRight, posCon.topLeft,
+                            posCon.bottomLeft, posCon.bottomRight)
+
     def __post_init__(self):
         self.topRight.bottomLeft = self
         self.topLeft.bottomRight = self
         self.bottomLeft.topRight = self
         self.bottomRight.topLeft = self
-
-    def __iter__(self) -> Iterator[PositionNode]:
-        return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
 
     def rightPositionsGen(self) -> Iterable[ResourceNode]:
         return self._posGen(self.topRight, self.right, self.bottomRight,

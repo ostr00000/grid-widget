@@ -5,7 +5,7 @@ from typing import Dict, Any, Callable, Iterator, TypeVar, List
 
 from boltons.cacheutils import cachedproperty
 
-from grid_widget.graph.nodes import PositionNode, ResourceNode
+from grid_widget.graph.nodes import ResourceNode, PositionContainer
 from grid_widget.graph.visitor import GraphVisitor
 
 T = TypeVar('T')
@@ -20,8 +20,8 @@ class _BalanceStruct:
 
 
 class GraphProperties:
-    def __init__(self, topLeft: PositionNode, filterNodes: List[ResourceNode] = None):
-        self.topLeft = topLeft
+    def __init__(self, posCon: PositionContainer, filterNodes: List[ResourceNode] = None):
+        self.posCon = posCon
         self._filterNodes = filterNodes
 
     def acceptNode(self, node: ResourceNode):
@@ -32,7 +32,7 @@ class GraphProperties:
     @cachedproperty
     def node2ColumnNumber(self) -> TravelDict:
         return reduce(self._countMaxColumns,
-                      GraphVisitor.topDownLeftRightVisitor(self.topLeft), {})
+                      GraphVisitor.topDownLeftRightVisitor(self.posCon.topLeft), {})
 
     @staticmethod
     def _countMaxColumns(acc: TravelDict, node: ResourceNode) -> TravelDict:
@@ -44,7 +44,7 @@ class GraphProperties:
     @cachedproperty
     def node2RowNumber(self) -> TravelDict:
         return reduce(self._countMaxRows,
-                      GraphVisitor.leftRightTopDown(self.topLeft), {})
+                      GraphVisitor.leftRightTopDown(self.posCon.topLeft), {})
 
     @staticmethod
     def _countMaxRows(acc: TravelDict, node: ResourceNode) -> TravelDict:
@@ -69,7 +69,7 @@ class GraphProperties:
     def node2horizontalSize(self) -> TravelDict:
         return reduce(
             partial(self._balance, childrenNodeFun=methodcaller('rightPositionsGen')),
-            GraphVisitor.topDownLeftRightVisitor(self.topLeft),
+            GraphVisitor.topDownLeftRightVisitor(self.posCon.topLeft),
             _BalanceStruct(self.maxColumnNumber, self.node2ColumnNumber),
         ).balanced
 
@@ -77,7 +77,7 @@ class GraphProperties:
     def node2VerticalSize(self) -> TravelDict:
         return reduce(
             partial(self._balance, childrenNodeFun=methodcaller('bottomPositionGen')),
-            GraphVisitor.leftRightTopDown(self.topLeft),
+            GraphVisitor.leftRightTopDown(self.posCon.topLeft),
             _BalanceStruct(self.maxRowNumber, self.node2RowNumber),
         ).balanced
 

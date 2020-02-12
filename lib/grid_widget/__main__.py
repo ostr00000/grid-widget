@@ -60,7 +60,6 @@ class MyWidget(QWidget):
         self.gridWidget.renderGraph()  # DEBUG
 
 
-
 def main():
     app = QApplication([])
 

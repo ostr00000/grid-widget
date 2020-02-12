@@ -6,7 +6,7 @@ from PyQt5.QtCore import QRect, QPoint
 from PyQt5.QtWidgets import QWidget
 
 from grid_widget.graph.distributor import Distributor
-from grid_widget.graph.nodes import PositionNode, ResourceNode
+from grid_widget.graph.nodes import PositionNode, ResourceNode, PositionContainer
 from grid_widget.graph.properties import GraphProperties
 from grid_widget.graph.stretch import Stretcher
 from grid_widget.graph.visitor import Filter, BorderGen, GraphVisitor
@@ -19,12 +19,12 @@ class GridGraph:
         dot = Digraph()
 
         for pn in self.positionNodes:
-            dot.node(str(id(pn)), label=str(pn), pos=f'{pn}')
+            dot.node(str(id(pn)), label=str(pn), pos=f'{pn.point.x()},{-pn.point.y()}')
 
         for rn in self.resourceNodes:
             p = functools.reduce(operator.add, (pn.point for pn in rn), QPoint())
             p /= 4
-            dot.node(str(id(rn)), label=str(rn), pos=f'{p.x()},{p.y()}')
+            dot.node(str(id(rn)), label=str(rn), pos=f'{p.x()},{-p.y()}')
 
             for pn in rn:
                 dot.edge(str(id(rn)), str(id(pn)))
@@ -32,23 +32,15 @@ class GridGraph:
         return dot
 
     def __init__(self, rect: QRect):
-        self.resourceNodes: List[ResourceNode] = []
         self.positionNodes: List[PositionNode] = []
+        self.corner = PositionContainer.fromRect(rect)
+        self.positionNodes.extend(self.corner)
 
-        self.tr = PositionNode(rect.topRight())
-        self.tl = PositionNode(rect.topLeft())
-        self.bl = PositionNode(rect.bottomLeft())
-        self.br = PositionNode(rect.bottomRight())
-
-        rn = ResourceNode(self.tr, self.tl, self.bl, self.br)
-        self.tr.bottomLeft = rn
-        self.tl.bottomRight = rn
-        self.bl.topRight = rn
-        self.br.topLeft = rn
-
+        self.resourceNodes: List[ResourceNode] = []
+        rn = ResourceNode.fromPositionContainer(self.corner)
         self.resourceNodes.append(rn)
-        self.positionNodes.extend([self.tr, self.tl, self.bl, self.br])
-        self.prop = GraphProperties(self.tl)
+
+        self.prop = GraphProperties(self.corner)
 
     def append(self, widget, rect: QRect):
         assert all(rn.widget != widget for rn in self.resourceNodes), "widget already added"
@@ -63,8 +55,10 @@ class GridGraph:
 
         self.refreshPositions(rect)
 
-    def refreshPositions(self, rect: QRect):
-        dist = Distributor(self.tl)
+    def refreshPositions(self, rect: QRect = None):
+        if rect is None:
+            rect = QRect(self.corner.topLeft.point, self.corner.bottomRight.point)
+        dist = Distributor(self.corner)
         dist.distribute(rect)
         self.prop = dist.prop
 
@@ -73,16 +67,18 @@ class GridGraph:
 
     def _appendRight(self, widget: QWidget, rect: QRect):
         rightBorder = list(Filter.byType(
-            BorderGen.topToDown(self.tr, walkRightSide=False), PositionNode))
+            BorderGen.topToDown(self.corner.topRight, walkRightSide=False),
+            PositionNode))
         assert len(rightBorder) >= 2
 
-        tl = self.tr
-        self.tr = PositionNode(rect.topRight())
-        bl = self.br
-        self.br = PositionNode(rect.bottomRight())
-        self.positionNodes.extend((self.tr, self.br))
+        tl = self.corner.topRight
+        bl = self.corner.bottomRight
 
-        rn = ResourceNode(self.tr, tl, bl, self.br, widget=widget, left=rightBorder[1:-1])
+        self.corner.topRight = tr = PositionNode(rect.topRight())
+        self.corner.bottomRight = br = PositionNode(rect.bottomRight())
+        self.positionNodes.extend((tr, br))
+
+        rn = ResourceNode(tr, tl, bl, br, widget=widget, left=rightBorder[1:-1])
         self.resourceNodes.append(rn)
 
         for rb in rightBorder:
@@ -94,15 +90,17 @@ class GridGraph:
 
     def _appendBottom(self, widget: QWidget, rect: QRect):
         bottomBorder = list(Filter.byType(
-            BorderGen.leftToRight(self.bl), PositionNode))
+            BorderGen.leftToRight(self.corner.bottomLeft), PositionNode))
         assert len(bottomBorder) >= 2
 
-        tr = self.br
-        tl = self.bl
-        self.bl = PositionNode(rect.bottomLeft())
-        self.br = PositionNode(rect.bottomRight())
+        tr = self.corner.bottomRight
+        tl = self.corner.bottomLeft
 
-        rn = ResourceNode(tr, tl, self.bl, self.br, widget=widget, top=bottomBorder[1:-1])
+        self.corner.bottomLeft = bl = PositionNode(rect.bottomLeft())
+        self.corner.bottomRight = br = PositionNode(rect.bottomRight())
+        self.positionNodes.extend((bl, br))
+
+        rn = ResourceNode(tr, tl, bl, br, widget=widget, top=bottomBorder[1:-1])
         self.resourceNodes.append(rn)
 
         for rb in bottomBorder:
@@ -121,8 +119,11 @@ class GridGraph:
         stretcher = Stretcher(resourceNode)
         stretcher.stretch()
 
-        for posNode in resourceNode:
+        it = zip(resourceNode, stretcher.newCorners)
+        for posNode, newPosNode in it:  # type: PositionNode, PositionContainer
             if len(posNode) == 0:
+                self.corner.update(posNode, newPosNode)
                 self.positionNodes.remove(posNode)
 
         self.resourceNodes.remove(resourceNode)
+        self.refreshPositions()

@@ -30,7 +30,7 @@ class GridWidget(QWidget):
         logger.info(outFile)
 
     def sizeHint(self) -> QSize:
-        return QSize(800, 800)
+        return QSize(100, 100)
 
     def addWidget(self, widget: QWidget):
         widget.setParent(self)
