@@ -77,6 +77,11 @@ class PositionContainer(Node):
             PositionNode(rect.bottomLeft()),
             PositionNode(rect.bottomRight()))
 
+    @classmethod
+    def fromPositionContainer(cls, posCon: PositionContainer):
+        return cls(posCon.topRight, posCon.topLeft,
+                   posCon.bottomLeft, posCon.bottomRight)
+
     def __iter__(self) -> Iterator[PositionNode]:
         return iter((self.topRight, self.topLeft, self.bottomLeft, self.bottomRight))
 
@@ -99,11 +104,6 @@ class ResourceNode(PositionContainer):
     left: List[PositionNode] = field(default_factory=list)
     bottom: List[PositionNode] = field(default_factory=list)
     right: List[PositionNode] = field(default_factory=list)
-
-    @classmethod
-    def fromPositionContainer(cls, posCon: PositionContainer):
-        return ResourceNode(posCon.topRight, posCon.topLeft,
-                            posCon.bottomLeft, posCon.bottomRight)
 
     def __post_init__(self):
         self.topRight.bottomLeft = self

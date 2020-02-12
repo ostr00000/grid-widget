@@ -1,4 +1,4 @@
-from typing import TypeVar, Tuple, Callable, Iterable, Optional
+from typing import TypeVar, Tuple, Callable, Iterable, Optional, List
 
 from PyQt5.QtCore import QRect
 from boltons.cacheutils import cachedproperty
@@ -63,7 +63,7 @@ class Stretcher:
         :param res: Removed node
         """
         self.res = res
-        self.newCorners: Optional[PositionContainer] = None
+        self.newCorners = PositionContainer.fromPositionContainer(res)
 
     def stretch(self):
         topRight = PositionNodeProperties(self.res.topRight)
@@ -71,46 +71,47 @@ class Stretcher:
         bottomLeft = PositionNodeProperties(self.res.bottomLeft)
         bottomRight = PositionNodeProperties(self.res.bottomRight)
 
+        nodesToResize = []
         if topRight.h and topLeft.h and bottomLeft.h and bottomRight.h:
-            self._horizontal(left=True, right=True)
+            nodesToResize.extend(self.getLeftNodes())
+            raise NotImplementedError
         elif topRight.v and topLeft.v and bottomLeft.v and bottomRight.v:
-            self._vertical(top=True, bottom=True)
+            raise NotImplementedError
 
         elif topRight.h and bottomRight.h:
-            self._horizontal(right=True)
+            raise NotImplementedError
         elif topLeft.h and bottomLeft.h:
-            self._horizontal(left=True)
+            nodesToResize.extend(self.getLeftNodes())
         elif topRight.v and topLeft.v:
-            self._vertical(top=True)
+            raise NotImplementedError
         elif bottomRight.v and bottomLeft.v:
-            self._vertical(bottom=True)
+            raise NotImplementedError
 
-    def _horizontal(self, left=False, right=False):
-        if left:
-            leftTopPoints = list(Filter.byPosY(
-                BorderGen.rightToLeft(self.res.topLeft), self.res.topLeft.point.y()))
-            leftBottomPoints = list(Filter.byPosY(
-                BorderGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
-                self.res.bottomLeft.point.y()))
-            lTop, lBot = longestCommonValues(
-                leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
+        else:  # is it possible? yes
+            # leave resource node without widget
+            raise NotImplementedError
 
-            toResize = list(Filter.byRect(
-                GraphVisitor.topDownLeftRightVisitor(lTop),
-                QRect(lTop.point, self.res.bottomLeft.point)))
+        self.res.unpinOthersRelations()
+        totalRect = QRect(self.newCorners.topLeft.point, self.newCorners.bottomRight.point)
+        Distributor(self.newCorners, filterNodes=nodesToResize).distribute(totalRect)
 
-            totalRect = QRect(lTop.point, self.res.bottomRight.point)
-            self.res.unpinOthersRelations()
+    def getLeftNodes(self) -> List[ResourceNode]:
+        leftTopPoints = list(Filter.byPosY(
+            BorderGen.rightToLeft(self.res.topLeft), self.res.topLeft.point.y()))
+        leftBottomPoints = list(Filter.byPosY(
+            BorderGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
+            self.res.bottomLeft.point.y()))
+        lTop, lBot = longestCommonValues(
+            leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
 
-            self.newCorners = PositionContainer(
-                self.res.topLeft, lTop, lBot, self.res.bottomLeft)
-            Distributor(self.newCorners, filterNodes=toResize).distribute(totalRect)
+        toResize = list(Filter.byRect(
+            GraphVisitor.topDownLeftRightVisitor(lTop),
+            QRect(lTop.point, self.res.bottomLeft.point)))
 
-            if right:
-                raise NotImplementedError
+        self.newCorners = PositionContainer(
+            self.newCorners.topLeft, lTop, lBot, self.newCorners.bottomLeft)
 
-    def _vertical(self, top=False, bottom=False):
-        raise NotImplementedError
+        return toResize
 
 
 def cmpX(pn1: PositionNode, pn2: PositionNode):

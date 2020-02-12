@@ -48,7 +48,7 @@ class MyWidget(QWidget):
     def onDeleteClicked(self, checked=False, force=False, forceNum=0):
         if force:
             widget = self.createdWidgets[forceNum]
-
+            self.createdWidgets.remove(widget)
         else:
             shuffle(self.createdWidgets)
             try:
