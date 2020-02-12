@@ -1,3 +1,5 @@
+import functools
+import operator
 from typing import Set, List
 
 from PyQt5.QtCore import QRect, QPoint
@@ -11,6 +13,23 @@ from grid_widget.graph.visitor import Filter, BorderGen, GraphVisitor
 
 
 class GridGraph:
+
+    def dump(self):
+        from graphviz import Digraph
+        dot = Digraph()
+
+        for pn in self.positionNodes:
+            dot.node(str(id(pn)), label=str(pn), pos=f'{pn}')
+
+        for rn in self.resourceNodes:
+            p = functools.reduce(operator.add, (pn.point for pn in rn), QPoint())
+            p /= 4
+            dot.node(str(id(rn)), label=str(rn), pos=f'{p.x()},{p.y()}')
+
+            for pn in rn:
+                dot.edge(str(id(rn)), str(id(pn)))
+
+        return dot
 
     def __init__(self, rect: QRect):
         self.resourceNodes: List[ResourceNode] = []

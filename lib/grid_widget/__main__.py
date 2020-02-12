@@ -29,7 +29,9 @@ class MyWidget(QWidget):
         # tests
         self.onCreateClicked()
         self.onCreateClicked()
-        self.gridWidget.removeWidget(self.createdWidgets[-1])
+        self.onDeleteClicked(force=True, forceNum=-1)
+        self.onCreateClicked()
+        self.onCreateClicked()
 
     def onCreateClicked(self):
         self.num += 1
@@ -41,14 +43,22 @@ class MyWidget(QWidget):
         self.gridWidget.addWidget(frame)
         self.createdWidgets.append(frame)
 
-    def onDeleteClicked(self):
-        shuffle(self.createdWidgets)
-        try:
-            widget = self.createdWidgets.pop()
-        except IndexError:
-            pass
+        self.gridWidget.renderGraph()  # DEBUG
+
+    def onDeleteClicked(self, checked=False, force=False, forceNum=0):
+        if force:
+            widget = self.createdWidgets[forceNum]
+
         else:
-            self.gridWidget.removeWidget(widget)
+            shuffle(self.createdWidgets)
+            try:
+                widget = self.createdWidgets.pop()
+            except IndexError:
+                return
+
+        self.gridWidget.removeWidget(widget)
+        self.gridWidget.renderGraph()  # DEBUG
+
 
 
 def main():
@@ -63,5 +73,5 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig()
+    logging.basicConfig(level=logging.DEBUG)
     main()

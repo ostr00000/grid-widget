@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<script>
+window.onload = function() {
+    var image = document.getElementById("img");
+
+    function updateImage() {
+        image.src = image.src.split("?")[0] + "?" + new Date().getTime();
+    }
+
+    setInterval(updateImage, 1000);
+}
+</script>
+<head>
+    <meta charset="UTF-8">
+    <title>Auto refresh graph</title>
+</head>
+<body>
+<img id="img" src="graph_widget.png"/>
+</body>
+</html>
