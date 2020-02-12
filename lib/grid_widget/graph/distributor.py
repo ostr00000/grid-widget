@@ -15,7 +15,7 @@ class Distributor:
     def distribute(self, rect: QRect):
         widthFactor = int(rect.width() / self.prop.maxColumnNumber)
         heightFactor = int(rect.height() / self.prop.maxRowNumber)
-        globalBottomRight = rect.bottomRight() + QPoint(1, 1)  # TODO maybe better not add
+        globalBottomRight = rect.bottomRight()  # + QPoint(1, 1)  # TODO maybe better not add
         visited: Set[int] = set()
 
         def updatePoint(posNode: PositionNode, y: int, x: int):
@@ -33,11 +33,14 @@ class Distributor:
             left = right + self.prop.node2horizontalSize[nodeId]
             right *= widthFactor
             left *= widthFactor
+            left -= 1
 
             bottom = self.prop.node2RowNumber[nodeId] - 1
             top = bottom + self.prop.node2VerticalSize[nodeId]
             bottom *= heightFactor
             top *= heightFactor
+            top -= 1
+
 
             updatePoint(node.topRight, top, right)
             updatePoint(node.bottomRight, bottom, right)
