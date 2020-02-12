@@ -26,7 +26,7 @@ class GridWidget(QWidget):
 
         dot.engine = 'neato'
         outFile = dot.render(
-            'graph_widget', directory='out', format='png', cleanup=True)
+            'graph_widget', directory='out', format='png')
         logger.info(outFile)
 
     def sizeHint(self) -> QSize:

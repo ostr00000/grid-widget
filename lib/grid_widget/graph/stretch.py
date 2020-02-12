@@ -103,7 +103,7 @@ class Stretcher:
             self.res.unpinOthersRelations()
 
             self.newCorners = PositionContainer(
-                self.res.topRight, lTop, lBot, self.res.bottomRight)
+                self.res.topLeft, lTop, lBot, self.res.bottomLeft)
             Distributor(self.newCorners, filterNodes=toResize).distribute(totalRect)
 
             if right:
