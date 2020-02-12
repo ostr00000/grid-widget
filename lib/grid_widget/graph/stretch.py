@@ -82,6 +82,9 @@ class Stretcher:
             raise NotImplementedError
         elif topLeft.h and bottomLeft.h:
             nodesToResize.extend(self.getLeftNodes())
+            totalRect = QRect(self.newCorners.topLeft.point, self.res.bottomRight.point)
+            self.newCorners.topRight = self.res.topLeft
+            self.newCorners.bottomRight = self.res.bottomLeft
         elif topRight.v and topLeft.v:
             raise NotImplementedError
         elif bottomRight.v and bottomLeft.v:
@@ -92,7 +95,6 @@ class Stretcher:
             raise NotImplementedError
 
         self.res.unpinOthersRelations()
-        totalRect = QRect(self.newCorners.topLeft.point, self.newCorners.bottomRight.point)
         Distributor(self.newCorners, filterNodes=nodesToResize).distribute(totalRect)
 
     def getLeftNodes(self) -> List[ResourceNode]:
@@ -108,8 +110,8 @@ class Stretcher:
             GraphVisitor.topDownLeftRightVisitor(lTop),
             QRect(lTop.point, self.res.bottomLeft.point)))
 
-        self.newCorners = PositionContainer(
-            self.newCorners.topLeft, lTop, lBot, self.newCorners.bottomLeft)
+        self.newCorners.topLeft = lTop
+        self.newCorners.bottomLeft = lBot
 
         return toResize
 
