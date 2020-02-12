@@ -1,6 +1,6 @@
 import functools
 import operator
-from typing import Set, List
+from typing import List
 
 from PyQt5.QtCore import QRect, QPoint
 from PyQt5.QtWidgets import QWidget
@@ -9,7 +9,7 @@ from grid_widget.graph.distributor import Distributor
 from grid_widget.graph.nodes import PositionNode, ResourceNode, PositionContainer
 from grid_widget.graph.properties import GraphProperties
 from grid_widget.graph.stretch import Stretcher
-from grid_widget.graph.visitor import Filter, BorderGen, GraphVisitor
+from grid_widget.graph.visitor import Filter, BorderGen
 
 
 class GridGraph:
