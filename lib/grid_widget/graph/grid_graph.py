@@ -14,20 +14,28 @@ from grid_widget.graph.visitor import Filter, BorderGen
 
 class GridGraph:
 
+    @staticmethod
+    def scale(point: QPoint):
+        return point / 10
+
     def dump(self):
         from graphviz import Digraph
         dot = Digraph()
 
         for pn in self.positionNodes:
-            dot.node(str(id(pn)), label=str(pn), pos=f'{pn.point.x()},{-pn.point.y()}')
+            p = self.scale(pn.point)
+            dot.node(str(id(pn)), label=f'{pn}\n{id(pn)}', pos=f'{p.x()},{-p.y()}!')
 
         for rn in self.resourceNodes:
             p = functools.reduce(operator.add, (pn.point for pn in rn), QPoint())
             p /= 4
-            dot.node(str(id(rn)), label=str(rn), pos=f'{p.x()},{-p.y()}')
+            p = self.scale(p)
+            dot.node(str(id(rn)), label=str(rn), pos=f'{p.x()},{-p.y()}!')
 
-            for pn in rn:
-                dot.edge(str(id(rn)), str(id(pn)))
+            mainNodes = list(rn)
+            for pn in rn.fullIter():
+                label = 'AD' if pn not in mainNodes else None
+                dot.edge(str(id(rn)), str(id(pn)), label=label)
 
         return dot
 
@@ -118,12 +126,8 @@ class GridGraph:
 
         stretcher = Stretcher(resourceNode)
         stretcher.stretch()
-
-        it = zip(resourceNode, stretcher.newCorners)
-        for posNode, newPosNode in it:  # type: PositionNode, PositionContainer
-            if len(posNode) == 0:
-                self.corner.update(posNode, newPosNode)
-                self.positionNodes.remove(posNode)
+        for pn in stretcher.removedPosNodes:
+            self.positionNodes.remove(pn)
 
         self.resourceNodes.remove(resourceNode)
         self.refreshPositions()

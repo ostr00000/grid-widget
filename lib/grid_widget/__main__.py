@@ -2,6 +2,8 @@ import logging
 from random import randint, shuffle
 from typing import Optional, List
 
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, \
     QFrame
 
@@ -20,7 +22,8 @@ class MyWidget(QWidget):
         self.verticalLayout.addWidget(self.createButton)
 
         self.deleteButton = QPushButton("Delete widget")
-        self.deleteButton.clicked.connect(self.onDeleteClicked)
+        self.deleteButton.setCheckable(True)
+        # self.deleteButton.clicked.connect(self.onDeleteClicked)
         self.verticalLayout.addWidget(self.deleteButton)
 
         self.gridWidget = GridWidget(self)
@@ -29,9 +32,18 @@ class MyWidget(QWidget):
         # tests
         self.onCreateClicked()
         self.onCreateClicked()
-        self.onDeleteClicked(force=True, forceNum=-1)
+        # self.onDeleteClicked(force=True, forceNum=-1)
         self.onCreateClicked()
         self.onCreateClicked()
+
+    def mousePressEvent(self, mouseEvent: QMouseEvent) -> None:
+        if self.deleteButton.isChecked() and mouseEvent.button() == Qt.LeftButton:
+            pos = mouseEvent.pos()
+            child = self.childAt(pos)
+            if child:
+                self.gridWidget.removeWidget(child)
+
+        super().mousePressEvent(mouseEvent)
 
     def onCreateClicked(self):
         self.num += 1
@@ -45,19 +57,19 @@ class MyWidget(QWidget):
 
         self.gridWidget.renderGraph()  # DEBUG
 
-    def onDeleteClicked(self, checked=False, force=False, forceNum=0):
-        if force:
-            widget = self.createdWidgets[forceNum]
-            self.createdWidgets.remove(widget)
-        else:
-            shuffle(self.createdWidgets)
-            try:
-                widget = self.createdWidgets.pop()
-            except IndexError:
-                return
-
-        self.gridWidget.removeWidget(widget)
-        self.gridWidget.renderGraph()  # DEBUG
+    # def onDeleteClicked(self, checked=False, force=False, forceNum=0):
+    #     if force:
+    #         widget = self.createdWidgets[forceNum]
+    #         self.createdWidgets.remove(widget)
+    #     else:
+    #         shuffle(self.createdWidgets)
+    #         try:
+    #             widget = self.createdWidgets.pop()
+    #         except IndexError:
+    #             return
+    #
+    #     self.gridWidget.removeWidget(widget)
+    #     self.gridWidget.renderGraph()  # DEBUG
 
 
 def main():

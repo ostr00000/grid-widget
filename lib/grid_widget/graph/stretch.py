@@ -6,7 +6,9 @@ from boltons.cacheutils import cachedproperty
 from grid_widget import Distributor
 from grid_widget.graph.nodes import ResourceNode, PositionNode, PositionContainer
 from grid_widget.graph.visitor import Filter, GraphVisitor, BorderGen
+import logging
 
+logger = logging.getLogger(__name__)
 TPN = Tuple[PositionNode, ...]
 
 
@@ -62,7 +64,9 @@ class PositionNodeProperties:
 class Stretcher:
     def __init__(self, remNode: ResourceNode):
         self.remNode = remNode
-        self.newCorners = PositionContainer.fromPositionContainer(remNode)
+        self.distributeCorners = PositionContainer.fromPositionContainer(remNode)
+
+        self.removedPosNodes = []
         self.nodesToResize = []
 
     def stretch(self):
@@ -72,21 +76,23 @@ class Stretcher:
         bottomRight = PositionNodeProperties(self.remNode.bottomRight)
 
         if topRight.h and topLeft.h and bottomLeft.h and bottomRight.h:
-            leftTop, leftBottom = self.getLeftNodes()
-            rightTop, rightBottom = self.getRightNodes()
-            totalRect = QRect(self.newCorners.topLeft.point, self.newCorners.bottomRight.point)
+            self.findLeftNodes()
+            self.findRightNodes()
 
         elif topRight.v and topLeft.v and bottomLeft.v and bottomRight.v:
             raise NotImplementedError
 
         elif topRight.h and bottomRight.h:
-            raise NotImplementedError
+            self.findRightNodes()
+            self.moveRelationsRight()
+            self.distributeCorners.topLeft = self.remNode.topLeft
+            self.distributeCorners.bottomLeft = self.remNode.bottomLeft
 
         elif topLeft.h and bottomLeft.h:
-            leftTop, leftBottom = self.getLeftNodes()
-            totalRect = QRect(self.newCorners.topLeft.point, self.remNode.bottomRight.point)
-            self.newCorners.topRight = self.remNode.topLeft
-            self.newCorners.bottomRight = self.remNode.bottomLeft
+            self.findLeftNodes()
+            self.moveRelationsLeft()
+            self.distributeCorners.topRight = self.remNode.topRight
+            self.distributeCorners.bottomRight = self.remNode.bottomRight
 
         elif topRight.v and topLeft.v:
             raise NotImplementedError
@@ -98,10 +104,12 @@ class Stretcher:
             # leave resource node without widget
             raise NotImplementedError
 
-        self.remNode.unpinOthersRelations()
-        Distributor(self.newCorners, filterNodes=self.nodesToResize).distribute(totalRect)
+        distributor = Distributor(self.distributeCorners, filterNodes=self.nodesToResize)
+        distributor.distribute(QRect(self.distributeCorners.topLeft.point,
+                                     self.distributeCorners.bottomRight.point))
 
-    def getLeftNodes(self):
+    def findLeftNodes(self):
+        logger.debug('finding Left')  # DEBUG
         leftTopPoints = list(Filter.byPosY(
             BorderGen.rightToLeft(self.remNode.topLeft, walkTopSide=False),
             self.remNode.topLeft.point.y()))
@@ -118,10 +126,12 @@ class Stretcher:
             QRect(lTop.point, self.remNode.bottomLeft.point)))
         self.nodesToResize.extend(nodesToResize)
 
-        self.newCorners.topLeft = lTop
-        self.newCorners.bottomLeft = lBot
+        self.distributeCorners.topLeft = lTop
+        self.distributeCorners.bottomLeft = lBot
 
-    def getRightNodes(self):
+    def findRightNodes(self):
+        logger.debug('finding Right')  # DEBUG
+
         rightTopPoints = list(Filter.byPosY(
             BorderGen.leftToRight(self.remNode.topRight, walkTopSide=False),
             self.remNode.topLeft.point.y()))
@@ -134,20 +144,45 @@ class Stretcher:
         rTop, rBot = commonRightTopPoints[-1], commonRightBottomPoints[-1]
 
         nodeToResize = list(Filter.byRect(
-            GraphVisitor.topDownLeftRightVisitor(rTop),
-            QRect(rTop.point, self.remNode.bottomRight.point)))
+            GraphVisitor.topDownLeftRightVisitor(self.remNode.topRight),
+            QRect(self.remNode.topRight.point, rBot.point)))
         self.nodesToResize.extend(nodeToResize)
 
-        self.newCorners.topRight = rTop
-        self.newCorners.bottomLeft = rBot
+        self.distributeCorners.topRight = rTop
+        self.distributeCorners.bottomRight = rBot
+
+    def moveRelationsLeft(self):  # TODO move method to ResNode
+        firstLeft = self.remNode.topLeft.bottomLeft
+        firstLeft.top.append(firstLeft.topRight)
+        firstLeft.topRight = self.remNode.topRight
+        firstLeft.topRight.bottomLeft = firstLeft
+
+        firstLeft = self.remNode.bottomLeft.topLeft
+        firstLeft.bottom.append(firstLeft.bottomRight)
+        firstLeft.bottomRight = self.remNode.bottomRight
+        firstLeft.bottomRight.topLeft = firstLeft
+
+    def moveRelationsRight(self):
+        firstRight = self.remNode.topRight.bottomRight
+        firstRight.top.insert(0, firstRight.topLeft)
+        firstRight.topLeft = self.remNode.topLeft
+        firstRight.topLeft.bottomRight = firstRight
+
+        firstRight = self.remNode.bottomRight.topRight
+        firstRight.bottom.insert(0, firstRight.bottomLeft)
+        firstRight.bottomLeft = self.remNode.bottomLeft
+        firstRight.bottomLeft.topRight = firstRight
+
+
+CMP_SNAP = 1
 
 
 def cmpX(pn1: PositionNode, pn2: PositionNode):
-    return pn1.point.x() - pn2.point.x()
+    return 0 if abs(x := pn1.point.x() - pn2.point.x()) <= CMP_SNAP else x
 
 
 def cmpY(pn1: PositionNode, pn2: PositionNode):
-    return pn1.point.y() - pn2.point.y()
+    return 0 if abs(y := pn1.point.y() - pn2.point.y()) <= CMP_SNAP else y
 
 
 T = TypeVar('T')

@@ -83,7 +83,7 @@ class BorderGen:
         else:
             resNode = startNode
 
-        while resNode:
+        while resNode is not None:
             yield resNode
 
             if posNode := posFun.attrGetter(resNode):

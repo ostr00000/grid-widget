@@ -111,6 +111,16 @@ class ResourceNode(PositionContainer):
         self.bottomLeft.topRight = self
         self.bottomRight.topLeft = self
 
+    def fullIter(self):
+        yield self.topRight
+        yield from self.top
+        yield self.topLeft
+        yield from self.left
+        yield self.bottomLeft
+        yield from self.bottom
+        yield self.bottomRight
+        yield from self.right
+
     def rightPositionsGen(self) -> Iterable[ResourceNode]:
         return self._posGen(self.topRight, self.right, self.bottomRight,
                             PosAttributes.bottomRight, PosAttributes.topRight)
