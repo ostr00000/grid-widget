@@ -1,4 +1,4 @@
-from typing import TypeVar, Tuple, Callable, Iterable, Optional, List
+from typing import TypeVar, Tuple, Callable, Iterable, List
 
 from PyQt5.QtCore import QRect
 from boltons.cacheutils import cachedproperty
@@ -6,6 +6,8 @@ from boltons.cacheutils import cachedproperty
 from grid_widget import Distributor
 from grid_widget.graph.nodes import ResourceNode, PositionNode, PositionContainer
 from grid_widget.graph.visitor import Filter, GraphVisitor, BorderGen
+
+TPN = Tuple[PositionNode, ...]
 
 
 class PositionNodeProperties:
@@ -58,35 +60,37 @@ class PositionNodeProperties:
 
 
 class Stretcher:
-    def __init__(self, res: ResourceNode):
-        """
-        :param res: Removed node
-        """
-        self.res = res
-        self.newCorners = PositionContainer.fromPositionContainer(res)
+    def __init__(self, remNode: ResourceNode):
+        self.remNode = remNode
+        self.newCorners = PositionContainer.fromPositionContainer(remNode)
+        self.nodesToResize = []
 
     def stretch(self):
-        topRight = PositionNodeProperties(self.res.topRight)
-        topLeft = PositionNodeProperties(self.res.topLeft)
-        bottomLeft = PositionNodeProperties(self.res.bottomLeft)
-        bottomRight = PositionNodeProperties(self.res.bottomRight)
+        topRight = PositionNodeProperties(self.remNode.topRight)
+        topLeft = PositionNodeProperties(self.remNode.topLeft)
+        bottomLeft = PositionNodeProperties(self.remNode.bottomLeft)
+        bottomRight = PositionNodeProperties(self.remNode.bottomRight)
 
-        nodesToResize = []
         if topRight.h and topLeft.h and bottomLeft.h and bottomRight.h:
-            nodesToResize.extend(self.getLeftNodes())
-            raise NotImplementedError
+            leftTop, leftBottom = self.getLeftNodes()
+            rightTop, rightBottom = self.getRightNodes()
+            totalRect = QRect(self.newCorners.topLeft.point, self.newCorners.bottomRight.point)
+
         elif topRight.v and topLeft.v and bottomLeft.v and bottomRight.v:
             raise NotImplementedError
 
         elif topRight.h and bottomRight.h:
             raise NotImplementedError
+
         elif topLeft.h and bottomLeft.h:
-            nodesToResize.extend(self.getLeftNodes())
-            totalRect = QRect(self.newCorners.topLeft.point, self.res.bottomRight.point)
-            self.newCorners.topRight = self.res.topLeft
-            self.newCorners.bottomRight = self.res.bottomLeft
+            leftTop, leftBottom = self.getLeftNodes()
+            totalRect = QRect(self.newCorners.topLeft.point, self.remNode.bottomRight.point)
+            self.newCorners.topRight = self.remNode.topLeft
+            self.newCorners.bottomRight = self.remNode.bottomLeft
+
         elif topRight.v and topLeft.v:
             raise NotImplementedError
+
         elif bottomRight.v and bottomLeft.v:
             raise NotImplementedError
 
@@ -94,26 +98,48 @@ class Stretcher:
             # leave resource node without widget
             raise NotImplementedError
 
-        self.res.unpinOthersRelations()
-        Distributor(self.newCorners, filterNodes=nodesToResize).distribute(totalRect)
+        self.remNode.unpinOthersRelations()
+        Distributor(self.newCorners, filterNodes=self.nodesToResize).distribute(totalRect)
 
-    def getLeftNodes(self) -> List[ResourceNode]:
+    def getLeftNodes(self):
         leftTopPoints = list(Filter.byPosY(
-            BorderGen.rightToLeft(self.res.topLeft), self.res.topLeft.point.y()))
+            BorderGen.rightToLeft(self.remNode.topLeft, walkTopSide=False),
+            self.remNode.topLeft.point.y()))
         leftBottomPoints = list(Filter.byPosY(
-            BorderGen.rightToLeft(self.res.bottomLeft, walkTopSide=True),
-            self.res.bottomLeft.point.y()))
-        lTop, lBot = longestCommonValues(
-            leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
+            BorderGen.rightToLeft(self.remNode.bottomLeft, walkTopSide=True),
+            self.remNode.bottomLeft.point.y()))
 
-        toResize = list(Filter.byRect(
+        gen = commonValuesGen(leftTopPoints, leftBottomPoints, lambda x, y: -cmpX(x, y))
+        commonLeftTopPoints, commonLeftBottomPoints = list(zip(*gen))  # type: TPN, TPN
+        lTop, lBot = commonLeftTopPoints[-1], commonLeftBottomPoints[-1]
+
+        nodesToResize = list(Filter.byRect(
             GraphVisitor.topDownLeftRightVisitor(lTop),
-            QRect(lTop.point, self.res.bottomLeft.point)))
+            QRect(lTop.point, self.remNode.bottomLeft.point)))
+        self.nodesToResize.extend(nodesToResize)
 
         self.newCorners.topLeft = lTop
         self.newCorners.bottomLeft = lBot
 
-        return toResize
+    def getRightNodes(self):
+        rightTopPoints = list(Filter.byPosY(
+            BorderGen.leftToRight(self.remNode.topRight, walkTopSide=False),
+            self.remNode.topLeft.point.y()))
+        rightBottomPoints = list(Filter.byPosY(
+            BorderGen.leftToRight(self.remNode.bottomRight, walkTopSide=True),
+            self.remNode.bottomLeft.point.y()))
+
+        gen = commonValuesGen(rightTopPoints, rightBottomPoints, cmpX)
+        commonRightTopPoints, commonRightBottomPoints = list(zip(*gen))  # type: TPN, TPN
+        rTop, rBot = commonRightTopPoints[-1], commonRightBottomPoints[-1]
+
+        nodeToResize = list(Filter.byRect(
+            GraphVisitor.topDownLeftRightVisitor(rTop),
+            QRect(rTop.point, self.remNode.bottomRight.point)))
+        self.nodesToResize.extend(nodeToResize)
+
+        self.newCorners.topRight = rTop
+        self.newCorners.bottomLeft = rBot
 
 
 def cmpX(pn1: PositionNode, pn2: PositionNode):
@@ -127,13 +153,14 @@ def cmpY(pn1: PositionNode, pn2: PositionNode):
 T = TypeVar('T')
 
 
-def longestCommonValues(a: Iterable[T], b: Iterable[T],
-                        cmpFun: Callable[[T, T], int]) -> Tuple[T, T]:
+def commonValuesGen(a: Iterable[T], b: Iterable[T],
+                    cmpFun: Callable[[T, T], int]) -> Iterable[Tuple[T, T]]:
     a = iter(a)
     b = iter(b)
     longestA = next(a)
     longestB = next(b)
     assert 0 == cmpFun(longestA, longestB), "First pair must be equal"
+    yield longestA, longestB
 
     try:
         while True:
@@ -145,6 +172,7 @@ def longestCommonValues(a: Iterable[T], b: Iterable[T],
                 else:
                     nextB = next(b)
             longestA, longestB = nextA, nextB
+            yield longestA, longestB
 
     except StopIteration:
-        return longestA, longestB
+        pass
