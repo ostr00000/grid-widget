@@ -1,25 +1,35 @@
 from __future__ import annotations
 
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QPaintEvent
-from PyQt5.QtWidgets import QWidget, QSizePolicy
+from typing import Tuple
 
-from grid_widget.graph.__init__ import GridGraph
+from PyQt5.QtCore import QSize
+from PyQt5.QtWidgets import QWidget, QSizePolicy, QGridLayout
 
 
 class GridWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._grid = GridGraph(self.rect())
+        self._gridLayout = QGridLayout(self)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def sizeHint(self) -> QSize:
-        return QSize(800, 800)
+        return QSize(100, 100)
 
     def addWidget(self, widget: QWidget):
         widget.setParent(self)
-        self._grid.insert(widget, self.rect())
+        self._gridLayout.addWidget(widget, *self._getFreePosition())
         widget.show()
 
-    def paintEvent(self, event: QPaintEvent) -> None:
-        self._grid.balance(self.rect())
+    def _getFreePosition(self) -> Tuple[int, int]:
+        rc = self._gridLayout.rowCount()
+        cc = self._gridLayout.columnCount()
+
+        for x in range(rc):
+            for y in range(cc):
+                if self._gridLayout.itemAtPosition(x, y) is None:
+                    return x, y
+
+        if rc <= cc:
+            return rc, 0
+        else:
+            return 0, cc

@@ -1,9 +1,8 @@
 import logging
-from random import randint
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, \
-    QFrame
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
+from drag_widget.frame import DragFrame
 from grid_widget.__init__ import GridWidget
 
 
@@ -25,11 +24,7 @@ class MyWidget(QWidget):
 
     def onButtonClicked(self):
         self.num += 1
-        frame = QFrame(self)
-        frame.setObjectName(f"Frame {self.num}")
-
-        color = (randint(0, 255), randint(0, 255), randint(0, 255))
-        frame.setStyleSheet("background-color: rgb({},{},{});".format(*color))
+        frame = DragFrame(f"Frame {self.num}")
         self.gridWidget.addWidget(frame)
 
 
